@@ -28,3 +28,18 @@ addopts = "-v --tb=short"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "src/analytics/athena_queries.py",
+    "src/extract/football_api.py",
+    "src/load/s3_loader.py",
+    "src/main.py",
+    "src/query/athena_query.py",
+    "src/transform/glue_transform.py",
+]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
