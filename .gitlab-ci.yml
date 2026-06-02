@@ -5,17 +5,16 @@ stages:
   - deploy
 
 # ── Credentials AWS ────────────────────────────────────────────────────────────
-# Les variables AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY et AWS_DEFAULT_REGION
-# sont déclarées comme variables CI/CD protégées dans GitLab :
-#   Settings → CI/CD → Variables → Add variable (cocher "Protected" et "Masked")
-# Ne jamais les écrire dans ce fichier : elles seraient exposées dans les logs
-# et dans l'historique git.
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY et AWS_DEFAULT_REGION sont déclarées
+# comme variables CI/CD protégées dans GitLab (Settings → CI/CD → Variables).
+# Ne jamais les écrire dans ce fichier.
 # ──────────────────────────────────────────────────────────────────────────────
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
-.python-base: &python-base
+# Template partagé — hérité via extends: (YAML merge keys supprimés en GitLab 17)
+.python-base:
   image: python:3.12-slim
   cache:
     key: "${CI_COMMIT_REF_SLUG}-pip"
@@ -29,14 +28,13 @@ variables:
 # ==============================================================================
 
 lint:flake8:
-  <<: *python-base
+  extends: .python-base
   stage: lint
   script:
     - flake8 src/ tests/
-  # max-line-length = 100 est configuré dans .flake8 (cohérence local/CI)
 
 lint:black:
-  <<: *python-base
+  extends: .python-base
   stage: lint
   script:
     - black --check src/ tests/
@@ -46,7 +44,7 @@ lint:black:
 # ==============================================================================
 
 test:unit:
-  <<: *python-base
+  extends: .python-base
   stage: test
   before_script:
     - pip install -r requirements.txt pytest-cov
@@ -62,9 +60,7 @@ test:unit:
   artifacts:
     when: always
     reports:
-      # Résultats de tests visibles dans l'onglet "Tests" de la MR/pipeline GitLab
       junit: report.xml
-      # Badge de couverture et diff de couverture dans les MR
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
@@ -81,7 +77,6 @@ build:wheel:
     - pip install build
   script:
     - python -m build --wheel
-    - echo "Wheel produit :"
     - ls -lh dist/
   artifacts:
     paths:
@@ -95,17 +90,13 @@ build:wheel:
 deploy:sql-sync:
   stage: deploy
   image: amazon/aws-cli:latest
-  # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY et AWS_DEFAULT_REGION
-  # sont injectées automatiquement depuis les variables CI/CD GitLab.
-  # Aucune valeur en dur dans ce fichier.
   script:
     - |
       aws s3 sync queries/ s3://football-pipeline-axel/scripts/ \
         --delete \
         --exclude "*.md"
   rules:
-    # Déclenchement uniquement sur la branche main, avec approbation manuelle
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
       allow_failure: false
   environment:
