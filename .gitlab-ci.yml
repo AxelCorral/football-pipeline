@@ -89,12 +89,11 @@ build:wheel:
 
 deploy:sql-sync:
   stage: deploy
-  image: amazon/aws-cli:latest
+  image:
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
   script:
-    - |
-      aws s3 sync queries/ s3://football-pipeline-axel/scripts/ \
-        --delete \
-        --exclude "*.md"
+    - aws s3 sync queries/ s3://football-pipeline-axel/scripts/ --exclude "*" --include "*.sql"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
