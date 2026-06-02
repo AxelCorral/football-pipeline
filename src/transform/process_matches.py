@@ -8,6 +8,7 @@ Pipeline :
 
 Schéma curated : curated/{competition_code}/{season}/matches.parquet
 """
+
 import io
 import json
 from typing import Any
@@ -85,7 +86,8 @@ def load_raw_from_s3(
             else:
                 logger.warning(
                     "Format inattendu dans %s (attendu list, reçu %s)",
-                    key, type(data).__name__
+                    key,
+                    type(data).__name__,
                 )
 
     if not all_matches:

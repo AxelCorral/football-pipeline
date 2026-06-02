@@ -5,11 +5,9 @@ Lance des requêtes sur les tables Glue/Athena pointant vers les données
 Parquet curées sur S3. Gère le polling du statut et la pagination
 des résultats via l'API boto3.
 """
-import logging
-import time
-from typing import Any
 
-import boto3
+import logging
+
 import pandas as pd
 
 from src.config import Config

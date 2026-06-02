@@ -13,6 +13,7 @@ Variables d'environnement attendues (voir .env.example) :
     AWS_BUCKET_NAME, AWS_REGION,
     ATHENA_DATABASE, ATHENA_OUTPUT_S3
 """
+
 import os
 from dataclasses import dataclass, field
 
@@ -37,21 +38,13 @@ class Config:
     ce qui permet de construire une config de test sans fichier .env.
     """
 
-    api_key: str = field(
-        default_factory=lambda: _env("API_KEY")
-    )
+    api_key: str = field(default_factory=lambda: _env("API_KEY"))
     football_api_base_url: str = field(
-        default_factory=lambda: _env("FOOTBALL_API_BASE_URL", "https://api.football-data.org/v4")
+        default_factory=lambda: _env(
+            "FOOTBALL_API_BASE_URL", "https://api.football-data.org/v4"
+        )
     )
-    aws_bucket_name: str = field(
-        default_factory=lambda: _env("AWS_BUCKET_NAME")
-    )
-    aws_region: str = field(
-        default_factory=lambda: _env("AWS_REGION", "eu-west-1")
-    )
-    athena_database: str = field(
-        default_factory=lambda: _env("ATHENA_DATABASE")
-    )
-    athena_output_s3: str = field(
-        default_factory=lambda: _env("ATHENA_OUTPUT_S3")
-    )
+    aws_bucket_name: str = field(default_factory=lambda: _env("AWS_BUCKET_NAME"))
+    aws_region: str = field(default_factory=lambda: _env("AWS_REGION", "eu-west-1"))
+    athena_database: str = field(default_factory=lambda: _env("ATHENA_DATABASE"))
+    athena_output_s3: str = field(default_factory=lambda: _env("ATHENA_OUTPUT_S3"))

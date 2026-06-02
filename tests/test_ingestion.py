@@ -4,6 +4,7 @@ Tests unitaires pour src/ingestion/fetch_matches.py.
 Couvre : récupération API avec retry, upload S3 JSON, construction de clé.
 Aucun appel réel : requests et boto3 sont entièrement mockés.
 """
+
 import json
 from datetime import date
 from unittest.mock import MagicMock, call, patch
@@ -129,7 +130,9 @@ class TestGetMatches:
             _mock_response(400),
             _mock_response(200, {"matches": sample_matches}),
         ]
-        with patch("src.ingestion.fetch_matches.requests.get", side_effect=responses) as mock_get:
+        with patch(
+            "src.ingestion.fetch_matches.requests.get", side_effect=responses
+        ) as mock_get:
             get_matches("PL", 2024, config=config)
 
         assert mock_get.call_count == 2
@@ -168,8 +171,13 @@ class TestGetMatches:
 
     def test_400_fallback_does_not_consume_retries(self, config, sample_matches):
         """Le fallback 400 est distinct des 3 retries transients : 2 appels max."""
-        responses = [_mock_response(400), _mock_response(200, {"matches": sample_matches})]
-        with patch("src.ingestion.fetch_matches.requests.get", side_effect=responses) as mock_get:
+        responses = [
+            _mock_response(400),
+            _mock_response(200, {"matches": sample_matches}),
+        ]
+        with patch(
+            "src.ingestion.fetch_matches.requests.get", side_effect=responses
+        ) as mock_get:
             get_matches("PL", 2024, config=config)
 
         assert mock_get.call_count == 2  # pas 3, pas 4
@@ -186,7 +194,9 @@ class TestGetMatches:
             _mock_response(200, {"matches": sample_matches}),
         ]
         with (
-            patch("src.ingestion.fetch_matches.requests.get", side_effect=responses) as mock_get,
+            patch(
+                "src.ingestion.fetch_matches.requests.get", side_effect=responses
+            ) as mock_get,
             patch("src.ingestion.fetch_matches.time.sleep"),
         ):
             result = get_matches("PL", 2023, config=config)
@@ -256,7 +266,9 @@ class TestUploadToS3:
         """put_object doit être appelé avec le bucket et la clé construite."""
         mock_s3 = MagicMock()
         with patch("src.ingestion.fetch_matches.boto3.client", return_value=mock_s3):
-            upload_to_s3(sample_matches, "my-bucket", "PL", date(2024, 3, 15), config=config)
+            upload_to_s3(
+                sample_matches, "my-bucket", "PL", date(2024, 3, 15), config=config
+            )
 
         mock_s3.put_object.assert_called_once()
         call_kwargs = mock_s3.put_object.call_args[1]
@@ -267,7 +279,9 @@ class TestUploadToS3:
         """Doit retourner une URI s3:// avec la clé construite."""
         mock_s3 = MagicMock()
         with patch("src.ingestion.fetch_matches.boto3.client", return_value=mock_s3):
-            uri = upload_to_s3(sample_matches, "my-bucket", "PL", date(2024, 3, 15), config=config)
+            uri = upload_to_s3(
+                sample_matches, "my-bucket", "PL", date(2024, 3, 15), config=config
+            )
 
         assert uri == "s3://my-bucket/raw/PL/2024-03-15/matches.json"
 
@@ -275,7 +289,9 @@ class TestUploadToS3:
         """Le corps uploadé doit être du JSON valide décodable."""
         mock_s3 = MagicMock()
         with patch("src.ingestion.fetch_matches.boto3.client", return_value=mock_s3):
-            upload_to_s3(sample_matches, "my-bucket", "PL", date(2024, 3, 15), config=config)
+            upload_to_s3(
+                sample_matches, "my-bucket", "PL", date(2024, 3, 15), config=config
+            )
 
         body: bytes = mock_s3.put_object.call_args[1]["Body"]
         parsed = json.loads(body.decode("utf-8"))
@@ -285,7 +301,9 @@ class TestUploadToS3:
         """Le ContentType doit être application/json."""
         mock_s3 = MagicMock()
         with patch("src.ingestion.fetch_matches.boto3.client", return_value=mock_s3):
-            upload_to_s3(sample_matches, "my-bucket", "PL", date(2024, 3, 15), config=config)
+            upload_to_s3(
+                sample_matches, "my-bucket", "PL", date(2024, 3, 15), config=config
+            )
 
         call_kwargs = mock_s3.put_object.call_args[1]
         assert call_kwargs["ContentType"] == "application/json"
@@ -293,7 +311,9 @@ class TestUploadToS3:
     def test_uses_aws_region_from_config(self, config):
         """boto3.client doit utiliser la région de la config."""
         mock_s3 = MagicMock()
-        with patch("src.ingestion.fetch_matches.boto3.client", return_value=mock_s3) as mock_client:
+        with patch(
+            "src.ingestion.fetch_matches.boto3.client", return_value=mock_s3
+        ) as mock_client:
             upload_to_s3([], "my-bucket", "PL", date(2024, 3, 15), config=config)
 
         mock_client.assert_called_once_with("s3", region_name="eu-west-1")

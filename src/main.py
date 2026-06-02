@@ -7,14 +7,10 @@ Orchestre les quatre étapes du pipeline :
   3. Transformation des données (normalisation, enrichissement)
   4. Stockage transformé sur S3 (zone curated/)
 """
+
 import logging
-from datetime import date, timedelta
 
 from src.config import Config
-from src.extract.football_api import FootballApiClient
-from src.load.s3_loader import S3Loader
-from src.query.athena_query import AthenaQueryRunner
-from src.transform.glue_transform import GlueTransformer
 
 logging.basicConfig(
     level=logging.INFO,

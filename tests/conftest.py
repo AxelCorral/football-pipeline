@@ -4,6 +4,7 @@ Fixtures pytest partagées entre tous les modules de tests.
 Fournit des instances de Settings factices et des données
 de matchs brutes simulant la réponse de l'API football-data.org.
 """
+
 import pytest
 
 from src.config import Config

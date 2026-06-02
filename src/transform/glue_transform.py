@@ -7,6 +7,7 @@ Normalise et enrichit les données brutes de matchs :
   - Ajout de colonnes de partitionnement Hive (year, month, day)
   - Déduplication et filtrage des matchs invalides
 """
+
 import logging
 from typing import Any
 

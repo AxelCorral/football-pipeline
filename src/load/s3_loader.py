@@ -5,14 +5,11 @@ Utilise boto3 et pyarrow pour sérialiser les données pandas
 et les uploader sur S3 avec un chemin partitionné par date.
 Schéma : {prefix}/year=YYYY/month=MM/day=DD/{filename}.parquet
 """
-import io
+
 import logging
 from datetime import date
 
-import boto3
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 
 from src.config import Config
 
