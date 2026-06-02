@@ -83,7 +83,10 @@ def load_raw_from_s3(
             if isinstance(data, list):
                 all_matches.extend(data)
             else:
-                logger.warning("Format inattendu dans %s (attendu list, reçu %s)", key, type(data).__name__)
+                logger.warning(
+                    "Format inattendu dans %s (attendu list, reçu %s)",
+                    key, type(data).__name__
+                )
 
     if not all_matches:
         logger.warning("Aucun match trouvé sous s3://%s/%s", bucket, prefix)
