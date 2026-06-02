@@ -1,6 +1,46 @@
+# Python
 .venv/
-.env
 __pycache__/
 *.pyc
-data/
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+
+# Outils d'analyse
 graphify-out/
+
+# AWS
+.aws/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Données locales
+data/
+*.parquet
+*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Tests & couverture
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# mypy
+.mypy_cache/
