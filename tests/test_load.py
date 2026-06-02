@@ -4,13 +4,6 @@ Tests unitaires pour src/load/s3_loader.py.
 Couvre : construction des clés S3 Hive-style, sérialisation Parquet,
 appel boto3 et valeur de retour (URI S3 complète).
 """
-from datetime import date
-from unittest.mock import MagicMock, patch
-
-import pandas as pd
-import pytest
-
-from src.load.s3_loader import S3Loader
 
 
 class TestS3Loader:

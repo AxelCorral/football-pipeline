@@ -7,6 +7,7 @@ Endpoint : GET /competitions/{code}/matches?season={YYYY}
            émet un second appel sans ce paramètre sur réception d'un 400.
 Schéma S3  : raw/{competition_code}/{YYYY-MM-DD}/matches.json
 """
+
 import json
 import time
 from datetime import date
@@ -112,16 +113,18 @@ def _request_with_retry(
             if status not in _RETRYABLE_STATUSES:
                 logger.error("Erreur HTTP %s sur %s (non retryable)", status, url)
                 raise
-            logger.warning("Erreur HTTP %s sur %s (tentative %d)", status, url, attempt + 1)
+            logger.warning(
+                "Erreur HTTP %s sur %s (tentative %d)", status, url, attempt + 1
+            )
             last_exc = exc
 
         except requests.RequestException as exc:
-            logger.warning("Erreur réseau sur %s (tentative %d) : %s", url, attempt + 1, exc)
+            logger.warning(
+                "Erreur réseau sur %s (tentative %d) : %s", url, attempt + 1, exc
+            )
             last_exc = exc
 
-    raise RuntimeError(
-        f"Échec après {_MAX_RETRIES} tentatives sur {url}"
-    ) from last_exc
+    raise RuntimeError(f"Échec après {_MAX_RETRIES} tentatives sur {url}") from last_exc
 
 
 def build_s3_key(competition_code: str, run_date: date | None = None) -> str:

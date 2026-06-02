@@ -5,11 +5,10 @@ Gère l'authentification par token X-Auth-Token, la récupération
 des matchs par compétition et plage de dates, et les erreurs HTTP.
 Référence : https://www.football-data.org/documentation/quickstart
 """
+
 import logging
 from datetime import date
 from typing import Any
-
-import requests
 
 from src.config import Config
 

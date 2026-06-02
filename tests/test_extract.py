@@ -4,13 +4,6 @@ Tests unitaires pour src/extract/football_api.py.
 Couvre : initialisation du client, récupération de matchs,
 gestion des erreurs HTTP et format des paramètres de date.
 """
-from datetime import date
-from unittest.mock import MagicMock, patch
-
-import pytest
-import requests
-
-from src.extract.football_api import FootballApiClient
 
 
 class TestFootballApiClient:

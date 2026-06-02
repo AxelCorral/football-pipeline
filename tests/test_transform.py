@@ -4,6 +4,7 @@ et src/transform/process_matches.py.
 
 Aucun appel réel : boto3 est entièrement mocké.
 """
+
 import io
 import json
 from unittest.mock import MagicMock, patch
@@ -12,14 +13,12 @@ import pandas as pd
 import pytest
 
 from src.config import Config
-from src.transform.glue_transform import GlueTransformer
 from src.transform.process_matches import (
     build_curated_key,
     load_raw_from_s3,
     save_as_parquet,
     transform,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -225,9 +224,20 @@ class TestTransform:
     def test_output_has_all_expected_columns(self, raw_df):
         out = transform(raw_df)
         expected = {
-            "match_id", "date", "competition", "competition_code", "season",
-            "home_team", "away_team", "home_goals", "away_goals",
-            "total_goals", "result", "status", "referee", "venue",
+            "match_id",
+            "date",
+            "competition",
+            "competition_code",
+            "season",
+            "home_team",
+            "away_team",
+            "home_goals",
+            "away_goals",
+            "total_goals",
+            "result",
+            "status",
+            "referee",
+            "venue",
         }
         assert expected.issubset(set(out.columns))
 
@@ -258,23 +268,37 @@ class TestTransform:
         assert transform(raw_df)["result"].iloc[0] == "H"
 
     def test_result_away_win(self):
-        df = pd.json_normalize([{
-            "id": 1, "utcDate": "2024-01-01T00:00:00Z", "status": "FINISHED",
-            "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
-            "score": {"fullTime": {"home": 0, "away": 2}},
-            "competition": {"name": "X", "code": "X"},
-            "season": {"startDate": "2023-08-01"},
-        }])
+        df = pd.json_normalize(
+            [
+                {
+                    "id": 1,
+                    "utcDate": "2024-01-01T00:00:00Z",
+                    "status": "FINISHED",
+                    "homeTeam": {"name": "A"},
+                    "awayTeam": {"name": "B"},
+                    "score": {"fullTime": {"home": 0, "away": 2}},
+                    "competition": {"name": "X", "code": "X"},
+                    "season": {"startDate": "2023-08-01"},
+                }
+            ]
+        )
         assert transform(df)["result"].iloc[0] == "A"
 
     def test_result_draw(self):
-        df = pd.json_normalize([{
-            "id": 1, "utcDate": "2024-01-01T00:00:00Z", "status": "FINISHED",
-            "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
-            "score": {"fullTime": {"home": 1, "away": 1}},
-            "competition": {"name": "X", "code": "X"},
-            "season": {"startDate": "2023-08-01"},
-        }])
+        df = pd.json_normalize(
+            [
+                {
+                    "id": 1,
+                    "utcDate": "2024-01-01T00:00:00Z",
+                    "status": "FINISHED",
+                    "homeTeam": {"name": "A"},
+                    "awayTeam": {"name": "B"},
+                    "score": {"fullTime": {"home": 1, "away": 1}},
+                    "competition": {"name": "X", "code": "X"},
+                    "season": {"startDate": "2023-08-01"},
+                }
+            ]
+        )
         assert transform(df)["result"].iloc[0] == "D"
 
     def test_result_is_none_when_score_absent(self):
@@ -308,37 +332,58 @@ class TestTransform:
         assert transform(raw_df)["referee"].iloc[0] == "Jon Moss"
 
     def test_referee_is_none_when_field_absent(self):
-        df = pd.json_normalize([{
-            "id": 1, "utcDate": "2024-01-01T00:00:00Z", "status": "FINISHED",
-            "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
-            "score": {"fullTime": {"home": 1, "away": 0}},
-            "competition": {"name": "X", "code": "X"},
-            "season": {"startDate": "2023-08-01"},
-        }])
+        df = pd.json_normalize(
+            [
+                {
+                    "id": 1,
+                    "utcDate": "2024-01-01T00:00:00Z",
+                    "status": "FINISHED",
+                    "homeTeam": {"name": "A"},
+                    "awayTeam": {"name": "B"},
+                    "score": {"fullTime": {"home": 1, "away": 0}},
+                    "competition": {"name": "X", "code": "X"},
+                    "season": {"startDate": "2023-08-01"},
+                }
+            ]
+        )
         assert pd.isna(transform(df)["referee"].iloc[0])
 
     def test_referee_is_none_when_list_is_empty(self):
-        df = pd.json_normalize([{
-            "id": 1, "utcDate": "2024-01-01T00:00:00Z", "status": "FINISHED",
-            "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
-            "score": {"fullTime": {"home": 1, "away": 0}},
-            "competition": {"name": "X", "code": "X"},
-            "season": {"startDate": "2023-08-01"},
-            "referees": [],
-        }])
+        df = pd.json_normalize(
+            [
+                {
+                    "id": 1,
+                    "utcDate": "2024-01-01T00:00:00Z",
+                    "status": "FINISHED",
+                    "homeTeam": {"name": "A"},
+                    "awayTeam": {"name": "B"},
+                    "score": {"fullTime": {"home": 1, "away": 0}},
+                    "competition": {"name": "X", "code": "X"},
+                    "season": {"startDate": "2023-08-01"},
+                    "referees": [],
+                }
+            ]
+        )
         assert transform(df)["referee"].iloc[0] is None
 
     def test_extracts_venue(self, raw_df):
         assert transform(raw_df)["venue"].iloc[0] == "Etihad Stadium"
 
     def test_venue_is_none_when_absent(self):
-        df = pd.json_normalize([{
-            "id": 1, "utcDate": "2024-01-01T00:00:00Z", "status": "FINISHED",
-            "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
-            "score": {"fullTime": {"home": 1, "away": 0}},
-            "competition": {"name": "X", "code": "X"},
-            "season": {"startDate": "2023-08-01"},
-        }])
+        df = pd.json_normalize(
+            [
+                {
+                    "id": 1,
+                    "utcDate": "2024-01-01T00:00:00Z",
+                    "status": "FINISHED",
+                    "homeTeam": {"name": "A"},
+                    "awayTeam": {"name": "B"},
+                    "score": {"fullTime": {"home": 1, "away": 0}},
+                    "competition": {"name": "X", "code": "X"},
+                    "season": {"startDate": "2023-08-01"},
+                }
+            ]
+        )
         assert pd.isna(transform(df)["venue"].iloc[0])
 
     def test_empty_dataframe_returns_column_schema(self):
@@ -354,13 +399,20 @@ class TestTransform:
 
     def test_competition_code_none_when_field_absent(self):
         """competition.code absent de la réponse → colonne None, pas d'erreur."""
-        df = pd.json_normalize([{
-            "id": 1, "utcDate": "2024-01-01T00:00:00Z", "status": "FINISHED",
-            "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
-            "score": {"fullTime": {"home": 1, "away": 0}},
-            "competition": {"name": "League X"},  # pas de 'code'
-            "season": {"startDate": "2023-08-01"},
-        }])
+        df = pd.json_normalize(
+            [
+                {
+                    "id": 1,
+                    "utcDate": "2024-01-01T00:00:00Z",
+                    "status": "FINISHED",
+                    "homeTeam": {"name": "A"},
+                    "awayTeam": {"name": "B"},
+                    "score": {"fullTime": {"home": 1, "away": 0}},
+                    "competition": {"name": "League X"},  # pas de 'code'
+                    "season": {"startDate": "2023-08-01"},
+                }
+            ]
+        )
         out = transform(df)
         assert pd.isna(out["competition_code"].iloc[0])
 
@@ -378,7 +430,9 @@ class TestSaveAsParquet:
         mock_s3 = MagicMock()
 
         with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
-            save_as_parquet(df, "my-bucket", "curated/PL/2023/matches.parquet", config=config)
+            save_as_parquet(
+                df, "my-bucket", "curated/PL/2023/matches.parquet", config=config
+            )
 
         mock_s3.put_object.assert_called_once()
         kw = mock_s3.put_object.call_args[1]
@@ -390,7 +444,9 @@ class TestSaveAsParquet:
         mock_s3 = MagicMock()
 
         with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
-            uri = save_as_parquet(df, "my-bucket", "curated/PL/2023/matches.parquet", config=config)
+            uri = save_as_parquet(
+                df, "my-bucket", "curated/PL/2023/matches.parquet", config=config
+            )
 
         assert uri == "s3://my-bucket/curated/PL/2023/matches.parquet"
 
@@ -399,7 +455,9 @@ class TestSaveAsParquet:
         mock_s3 = MagicMock()
 
         with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
-            save_as_parquet(df, "my-bucket", "curated/PL/2023/matches.parquet", config=config)
+            save_as_parquet(
+                df, "my-bucket", "curated/PL/2023/matches.parquet", config=config
+            )
 
         body: bytes = mock_s3.put_object.call_args[1]["Body"]
         result = pd.read_parquet(io.BytesIO(body))
@@ -411,7 +469,9 @@ class TestSaveAsParquet:
         mock_s3 = MagicMock()
 
         with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
-            save_as_parquet(df, "my-bucket", "curated/PL/2023/matches.parquet", config=config)
+            save_as_parquet(
+                df, "my-bucket", "curated/PL/2023/matches.parquet", config=config
+            )
 
         body: bytes = mock_s3.put_object.call_args[1]["Body"]
         result = pd.read_parquet(io.BytesIO(body))
@@ -428,7 +488,9 @@ class TestSaveAsParquet:
         with patch(
             "src.transform.process_matches.boto3.client", return_value=mock_s3
         ) as mock_client:
-            save_as_parquet(df, "my-bucket", "curated/PL/2023/matches.parquet", config=config)
+            save_as_parquet(
+                df, "my-bucket", "curated/PL/2023/matches.parquet", config=config
+            )
 
         mock_client.assert_called_once_with("s3", region_name="eu-west-1")
 

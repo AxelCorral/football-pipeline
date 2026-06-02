@@ -11,6 +11,7 @@ Notes sur les types Athena :
   - Les cellules NULL sont représentées par un dict vide ``{}`` dans l'API
     boto3 ; elles sont converties en ``None`` dans le DataFrame résultant.
 """
+
 import time
 
 import boto3
@@ -117,10 +118,7 @@ def results_to_dataframe(
 
         if columns is None:
             # Première page : la ligne 0 contient les noms de colonnes.
-            columns = [
-                cell.get("VarCharValue", "")
-                for cell in result_rows[0]["Data"]
-            ]
+            columns = [cell.get("VarCharValue", "") for cell in result_rows[0]["Data"]]
             result_rows = result_rows[1:]
             logger.info(
                 "Colonnes Athena (%d) : %s",

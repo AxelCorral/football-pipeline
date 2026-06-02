@@ -8,6 +8,7 @@ Usage :
     logger = get_logger(__name__)
     logger.info("Pipeline démarré")
 """
+
 import logging
 import sys
 

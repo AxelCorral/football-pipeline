@@ -4,12 +4,6 @@ Tests unitaires pour src/query/athena_query.py.
 Couvre : soumission de requêtes, polling du statut d'exécution,
 récupération paginée des résultats et gestion des timeouts/erreurs.
 """
-from unittest.mock import MagicMock, patch
-
-import pandas as pd
-import pytest
-
-from src.query.athena_query import AthenaQueryRunner
 
 
 class TestAthenaQueryRunner:
