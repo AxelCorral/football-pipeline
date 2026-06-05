@@ -24,13 +24,18 @@ graphify-out/
 *.swp
 *.swo
 
+# ML models
+models/*.joblib
+
 # OS
 .DS_Store
 Thumbs.db
 
 # Données locales
-data/
-*.parquet
+data/*
+!data/cache/
+data/cache/*
+!data/cache/*.parquet
 *.csv
 
 # Jupyter
