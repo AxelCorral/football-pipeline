@@ -21,6 +21,14 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+COMPETITION_NAMES: dict[str, str] = {
+    "PL": "Premier League",
+    "FL1": "Ligue 1",
+    "BL1": "Bundesliga",
+    "SA": "Serie A",
+    "PD": "Primera Division",
+}
+
 _MAX_RETRIES = 3
 _BACKOFF_BASE = 2  # délais : 2^1=2 s, 2^2=4 s
 
@@ -125,6 +133,48 @@ def _request_with_retry(
             last_exc = exc
 
     raise RuntimeError(f"Échec après {_MAX_RETRIES} tentatives sur {url}") from last_exc
+
+
+_INTER_COMPETITION_DELAY = 7  # secondes — respect du rate limit free tier
+
+
+def fetch_all_competitions(
+    competitions: list[str],
+    season: int | None = None,
+    *,
+    config: Config | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Récupère les matchs de plusieurs compétitions avec pause entre chaque appel.
+
+    Un délai de 7 secondes est respecté entre chaque compétition pour ne pas
+    dépasser le rate limit du free tier de football-data.org.
+
+    Args:
+        competitions: Liste de codes de compétition (ex : ["PL", "BL1"]).
+        season: Année de début de saison (ex : 2024). None = saison courante.
+        config: Configuration du pipeline ; ``Config()`` si None.
+
+    Returns:
+        Dict ``{code: [matchs]}`` — liste vide si la compétition a échoué.
+    """
+    results: dict[str, list[dict[str, Any]]] = {}
+    total = len(competitions)
+    for i, code in enumerate(competitions, 1):
+        name = COMPETITION_NAMES.get(code, code)
+        logger.info("Ingestion %s — %s… (%d/%d)", code, name, i, total)
+        try:
+            matches = get_matches(code, season=season, config=config)
+            results[code] = matches
+            logger.info("%s : %d matchs récupérés", code, len(matches))
+        except Exception as exc:
+            logger.error("Erreur %s : %s — compétition ignorée", code, exc)
+            results[code] = []
+        if i < total:
+            logger.debug(
+                "Pause %ds avant la prochaine compétition…", _INTER_COMPETITION_DELAY
+            )
+            time.sleep(_INTER_COMPETITION_DELAY)
+    return results
 
 
 def build_s3_key(competition_code: str, run_date: date | None = None) -> str:
