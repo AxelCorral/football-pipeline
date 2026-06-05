@@ -13,7 +13,12 @@ import pytest
 import requests
 
 from src.config import Config
-from src.ingestion.fetch_matches import build_s3_key, get_matches, upload_to_s3
+from src.ingestion.fetch_matches import (
+    build_s3_key,
+    fetch_all_competitions,
+    get_matches,
+    upload_to_s3,
+)
 
 
 @pytest.fixture
@@ -331,6 +336,89 @@ class TestUploadToS3:
 
         call_kwargs = mock_s3.put_object.call_args[1]
         assert call_kwargs["Key"] == "raw/BL1/2024-06-01/matches.json"
+
+
+class TestFetchAllCompetitions:
+    """Tests de la fonction fetch_all_competitions."""
+
+    def test_calls_get_matches_for_each_competition(self, config, sample_matches):
+        """Doit appeler get_matches une fois par compétition."""
+        competitions = ["PL", "FL1", "BL1"]
+        with (
+            patch(
+                "src.ingestion.fetch_matches.get_matches",
+                return_value=sample_matches,
+            ) as mock_gm,
+            patch("src.ingestion.fetch_matches.time.sleep"),
+        ):
+            result = fetch_all_competitions(competitions, config=config)
+
+        assert mock_gm.call_count == len(competitions)
+        assert set(result.keys()) == set(competitions)
+
+    def test_returns_matches_per_competition(self, config, sample_matches):
+        """Le dict retourné doit mapper code → liste de matchs."""
+        with (
+            patch(
+                "src.ingestion.fetch_matches.get_matches",
+                return_value=sample_matches,
+            ),
+            patch("src.ingestion.fetch_matches.time.sleep"),
+        ):
+            result = fetch_all_competitions(["PL", "SA"], config=config)
+
+        assert result["PL"] == sample_matches
+        assert result["SA"] == sample_matches
+
+    def test_sleeps_between_competitions_not_after_last(self, config, sample_matches):
+        """Doit dormir N-1 fois (pas après le dernier appel) avec un délai de 7s."""
+        competitions = ["PL", "FL1", "BL1"]
+        with (
+            patch(
+                "src.ingestion.fetch_matches.get_matches",
+                return_value=sample_matches,
+            ),
+            patch("src.ingestion.fetch_matches.time.sleep") as mock_sleep,
+        ):
+            fetch_all_competitions(competitions, config=config)
+
+        assert mock_sleep.call_count == len(competitions) - 1
+        mock_sleep.assert_called_with(7)
+
+    def test_handles_error_gracefully_and_continues(self, config, sample_matches):
+        """Une erreur sur une compétition ne stoppe pas les autres."""
+
+        def _side_effect(code, **kw):
+            if code == "FL1":
+                raise RuntimeError("API down")
+            return sample_matches
+
+        with (
+            patch(
+                "src.ingestion.fetch_matches.get_matches",
+                side_effect=_side_effect,
+            ),
+            patch("src.ingestion.fetch_matches.time.sleep"),
+        ):
+            result = fetch_all_competitions(["PL", "FL1", "BL1"], config=config)
+
+        assert result["PL"] == sample_matches
+        assert result["FL1"] == []
+        assert result["BL1"] == sample_matches
+
+    def test_passes_season_to_get_matches(self, config, sample_matches):
+        """Le paramètre season doit être transmis à chaque appel get_matches."""
+        with (
+            patch(
+                "src.ingestion.fetch_matches.get_matches",
+                return_value=sample_matches,
+            ) as mock_gm,
+            patch("src.ingestion.fetch_matches.time.sleep"),
+        ):
+            fetch_all_competitions(["PL"], season=2024, config=config)
+
+        _, kwargs = mock_gm.call_args
+        assert kwargs.get("season") == 2024
 
 
 class TestBuildS3Key:

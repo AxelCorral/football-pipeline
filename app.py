@@ -1,4 +1,4 @@
-"""Streamlit dashboard — Football Pipeline (Premier League)."""
+"""Streamlit dashboard — Football Pipeline (5 grandes ligues européennes)."""
 
 import sys
 import tempfile
@@ -14,7 +14,15 @@ from src.ml.evaluate import baseline_accuracy
 from src.ml.features import FEATURE_COLS, compute_features
 from src.ml.train import LABEL_MAP, train_model
 
-CACHE_PATH = Path("data/cache/matches_PL_2025.parquet")
+CACHE_PATH = Path("data/cache/matches_all_2025.parquet")
+
+COMPETITION_NAMES: dict[str, str] = {
+    "PL": "Premier League",
+    "FL1": "Ligue 1",
+    "BL1": "Bundesliga",
+    "SA": "Serie A",
+    "PD": "Primera Division",
+}
 
 st.set_page_config(
     page_title="Football Pipeline",
@@ -25,6 +33,7 @@ st.set_page_config(
 
 # ── Data & model loading ───────────────────────────────────────────────────────
 
+
 @st.cache_data
 def load_data() -> pd.DataFrame:
     if not CACHE_PATH.exists():
@@ -33,11 +42,13 @@ def load_data() -> pd.DataFrame:
 
 
 @st.cache_resource
-def _train(_cache_mtime: float):
-    """Entraîne le modèle une seule fois ; re-cache si le fichier change."""
+def _train(_cache_mtime: float, league_filter: str):
+    """Entraîne le modèle une seule fois par (fichier, compétition)."""
     df = load_data()
     if df.empty:
         return None, None, None, None
+    if league_filter != "Toutes" and "league_code" in df.columns:
+        df = df[df["league_code"] == league_filter]
     df_feat = compute_features(df)
     baseline = baseline_accuracy(df)
     _tmp = Path(tempfile.mkdtemp())
@@ -48,12 +59,13 @@ def _train(_cache_mtime: float):
     return model, acc, baseline, df_feat
 
 
-def get_model():
+def get_model(league_filter: str = "Toutes"):
     mtime = CACHE_PATH.stat().st_mtime if CACHE_PATH.exists() else 0.0
-    return _train(mtime)
+    return _train(mtime, league_filter)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def compute_standings(finished: pd.DataFrame, mode: str) -> pd.DataFrame:
     teams = sorted(
@@ -81,20 +93,26 @@ def compute_standings(finished: pd.DataFrame, mode: str) -> pd.DataFrame:
             w = int((hm["result"] == "H").sum()) + int((am["result"] == "A").sum())
             d = int((hm["result"] == "D").sum()) + int((am["result"] == "D").sum())
             l = int((hm["result"] == "A").sum()) + int((am["result"] == "H").sum())
-            gf = int(hm["home_goals"].fillna(0).sum()) + int(am["away_goals"].fillna(0).sum())
-            ga = int(hm["away_goals"].fillna(0).sum()) + int(am["home_goals"].fillna(0).sum())
+            gf = int(hm["home_goals"].fillna(0).sum()) + int(
+                am["away_goals"].fillna(0).sum()
+            )
+            ga = int(hm["away_goals"].fillna(0).sum()) + int(
+                am["home_goals"].fillna(0).sum()
+            )
 
-        rows.append({
-            "Équipe": team,
-            "J": w + d + l,
-            "G": w,
-            "N": d,
-            "P": l,
-            "BP": gf,
-            "BC": ga,
-            "Diff": gf - ga,
-            "Pts": w * 3 + d,
-        })
+        rows.append(
+            {
+                "Équipe": team,
+                "J": w + d + l,
+                "G": w,
+                "N": d,
+                "P": l,
+                "BP": gf,
+                "BC": ga,
+                "Diff": gf - ga,
+                "Pts": w * 3 + d,
+            }
+        )
 
     return (
         pd.DataFrame(rows)
@@ -112,18 +130,22 @@ def build_prediction_row(
         return None
     h = home_rows.iloc[-1]
     a = away_rows.iloc[-1]
-    return pd.DataFrame([{
-        "home_form": h["home_form"],
-        "away_form": a["away_form"],
-        "home_goals_avg": h["home_goals_avg"],
-        "away_goals_avg": a["away_goals_avg"],
-        "home_conceded_avg": h["home_conceded_avg"],
-        "away_conceded_avg": a["away_conceded_avg"],
-        "home_advantage": 1,
-    }])
+    return pd.DataFrame(
+        [
+            {
+                "home_form": h["home_form"],
+                "away_form": a["away_form"],
+                "home_goals_avg": h["home_goals_avg"],
+                "away_goals_avg": a["away_goals_avg"],
+                "home_conceded_avg": h["home_conceded_avg"],
+                "away_conceded_avg": a["away_conceded_avg"],
+                "home_advantage": 1,
+            }
+        ]
+    )
 
 
-# ── Layout ─────────────────────────────────────────────────────────────────────
+# ── Sidebar ────────────────────────────────────────────────────────────────────
 
 st.sidebar.title("⚽ Football Pipeline")
 page = st.sidebar.radio(
@@ -136,18 +158,41 @@ df = load_data()
 
 if df.empty:
     st.error(
-        "Aucune donnée trouvée dans `data/cache/matches_PL_2025.parquet`. "
+        "Aucune donnée trouvée dans `data/cache/matches_all_2025.parquet`. "
         "Exécutez `python scripts/export_cache.py` pour générer le cache local."
     )
     st.stop()
 
+# Competition filter — visible dès que la colonne league_code est présente
+selected_league = "Toutes"
+if "league_code" in df.columns:
+    codes = sorted(df["league_code"].dropna().unique().tolist())
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Compétition**")
+    selected_league = st.sidebar.selectbox(
+        "Compétition",
+        ["Toutes"] + codes,
+        format_func=lambda x: "Toutes les compétitions"
+        if x == "Toutes"
+        else COMPETITION_NAMES.get(x, x),
+        label_visibility="collapsed",
+    )
+    if selected_league != "Toutes":
+        df = df[df["league_code"] == selected_league]
+
 finished = df[df["status"] == "FINISHED"].copy()
+
+competition_label = (
+    COMPETITION_NAMES.get(selected_league, selected_league)
+    if selected_league != "Toutes"
+    else "5 Grands Championnats Européens"
+)
 
 
 # ── Page 1 — Vue d'ensemble ───────────────────────────────────────────────────
 
 if page == "Vue d'ensemble":
-    st.title("🏆 Premier League — Vue d'ensemble")
+    st.title(f"🏆 {competition_label} — Vue d'ensemble")
     st.markdown(
         "**Problématique :** Prédire le résultat d'un match de football "
         "(victoire domicile · nul · victoire extérieur) à partir de la forme "
@@ -181,7 +226,9 @@ if page == "Vue d'ensemble":
         .rename(columns={"mean": "buts_moyens", "count": "nb_matchs"})
     )
     weekly["label"] = (
-        weekly["year"].astype(str) + "-S" + weekly["week"].astype(str).str.zfill(2)
+        weekly["year"].astype(str)
+        + "-S"
+        + weekly["week"].astype(str).str.zfill(2)
     )
 
     fig = px.line(
@@ -189,7 +236,11 @@ if page == "Vue d'ensemble":
         x="label",
         y="buts_moyens",
         hover_data={"nb_matchs": True, "label": False},
-        labels={"label": "Semaine", "buts_moyens": "Buts moyens", "nb_matchs": "Matchs"},
+        labels={
+            "label": "Semaine",
+            "buts_moyens": "Buts moyens",
+            "nb_matchs": "Matchs",
+        },
         template="plotly_dark",
     )
     fig.update_traces(line_color="#00d4ff", line_width=2)
@@ -200,7 +251,7 @@ if page == "Vue d'ensemble":
 # ── Page 2 — Classement & Performance ────────────────────────────────────────
 
 elif page == "Classement & Performance":
-    st.title("📊 Classement & Performance")
+    st.title(f"📊 {competition_label} — Classement & Performance")
 
     mode_label = st.radio(
         "Filtrer par :",
@@ -238,10 +289,10 @@ elif page == "Classement & Performance":
 # ── Page 3 — Prédiction ───────────────────────────────────────────────────────
 
 elif page == "Prédiction":
-    st.title("🤖 Prédiction de résultat")
+    st.title(f"🤖 Prédiction — {competition_label}")
 
     with st.spinner("Entraînement du modèle…"):
-        model, acc, baseline, df_feat = get_model()
+        model, acc, baseline, df_feat = get_model(selected_league)
 
     if model is None:
         st.error("Impossible d'entraîner le modèle (données insuffisantes).")
@@ -301,7 +352,17 @@ elif page == "À propos":
 ## Pipeline technique
 
 Ce projet construit un pipeline ETL complet pour analyser et prédire les résultats
-de la Premier League anglaise.
+de 5 grands championnats européens de football.
+
+### Compétitions couvertes
+
+| Code | Championnat |
+|------|-------------|
+| **PL** | Premier League (Angleterre) |
+| **FL1** | Ligue 1 (France) |
+| **BL1** | Bundesliga (Allemagne) |
+| **SA** | Serie A (Italie) |
+| **PD** | Primera Division / Liga (Espagne) |
 
 ### Architecture AWS
 
