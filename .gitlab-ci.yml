@@ -1,6 +1,7 @@
 stages:
   - lint
   - test
+  - model
   - build
   - deploy
 
@@ -64,6 +65,24 @@ test:unit:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
+    expire_in: 30 days
+
+# ==============================================================================
+# MODEL
+# ==============================================================================
+
+model:train:
+  extends: .python-base
+  stage: model
+  before_script:
+    - pip install -r requirements.txt scikit-learn==1.7.2 joblib==1.5.3
+  script:
+    - python -m src.ml.train
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  artifacts:
+    paths:
+      - models/*.joblib
     expire_in: 30 days
 
 # ==============================================================================
