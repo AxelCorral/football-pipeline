@@ -44,21 +44,21 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
 
     finished["_home_pts"] = finished["result"].map({"H": 3, "D": 1, "A": 0})
     finished["home_form"] = finished.groupby("home_team")["_home_pts"].transform(_roll)
-    finished["home_goals_avg"] = (
-        finished.groupby("home_team")["home_goals"].transform(_roll)
+    finished["home_goals_avg"] = finished.groupby("home_team")["home_goals"].transform(
+        _roll
     )
-    finished["home_conceded_avg"] = (
-        finished.groupby("home_team")["away_goals"].transform(_roll)
-    )
+    finished["home_conceded_avg"] = finished.groupby("home_team")[
+        "away_goals"
+    ].transform(_roll)
 
     finished["_away_pts"] = finished["result"].map({"A": 3, "D": 1, "H": 0})
     finished["away_form"] = finished.groupby("away_team")["_away_pts"].transform(_roll)
-    finished["away_goals_avg"] = (
-        finished.groupby("away_team")["away_goals"].transform(_roll)
+    finished["away_goals_avg"] = finished.groupby("away_team")["away_goals"].transform(
+        _roll
     )
-    finished["away_conceded_avg"] = (
-        finished.groupby("away_team")["home_goals"].transform(_roll)
-    )
+    finished["away_conceded_avg"] = finished.groupby("away_team")[
+        "home_goals"
+    ].transform(_roll)
 
     finished["home_advantage"] = 1
 

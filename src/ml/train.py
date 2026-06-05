@@ -106,4 +106,6 @@ if __name__ == "__main__":  # pragma: no cover
     logger.info("Baseline naïve (toujours H) : %.3f", baseline)
 
     model, acc, cm = train_model(df_feat)
-    logger.info("Accuracy finale : %.3f  |  gain vs baseline : %+.3f", acc, acc - baseline)
+    logger.info(
+        "Accuracy finale : %.3f  |  gain vs baseline : %+.3f", acc, acc - baseline
+    )

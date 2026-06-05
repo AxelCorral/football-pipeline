@@ -7,7 +7,6 @@ from src.ml.evaluate import baseline_accuracy
 from src.ml.features import FEATURE_COLS, compute_features
 from src.ml.train import LABEL_MAP, train_model
 
-
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
@@ -58,7 +57,9 @@ def df_matches():
 
 @pytest.fixture
 def df_with_unfinished(df_matches):
-    unfinished = pd.DataFrame([_match("2024-04-15", "A", "C", 0, 0, status="SCHEDULED")])
+    unfinished = pd.DataFrame(
+        [_match("2024-04-15", "A", "C", 0, 0, status="SCHEDULED")]
+    )
     return pd.concat([df_matches, unfinished], ignore_index=True)
 
 
@@ -107,7 +108,15 @@ class TestComputeFeatures:
 
     def test_empty_input_returns_empty_with_columns(self):
         empty = pd.DataFrame(
-            columns=["date", "home_team", "away_team", "home_goals", "away_goals", "result", "status"]
+            columns=[
+                "date",
+                "home_team",
+                "away_team",
+                "home_goals",
+                "away_goals",
+                "result",
+                "status",
+            ]
         )
         result = compute_features(empty)
         assert result.empty
