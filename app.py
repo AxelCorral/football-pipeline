@@ -656,10 +656,8 @@ def build_prediction_row(
 def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
     n = len(standings)
     sep_after: dict[int, str] = {}
-    if with_zones and n >= 8:
-        sep_after[4] = "Champions League"
-        sep_after[5] = "Europa League"
-        sep_after[n - 3] = "Relegation"
+    if with_zones and n >= 2:
+        sep_after[1] = "Champion"
 
     thead = (
         "<thead><tr>"
@@ -675,10 +673,14 @@ def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
     for i, row in standings.iterrows():
         rank = i + 1
         if rank > 1 and (rank - 1) in sep_after:
-            label = sep_after[rank - 1]
             rows_html.append(
                 '<tr class="sep"><td colspan="11">'
-                f'<div><span class="sep-label">{label}</span></div>'
+                '<div style="border-top:1px dashed #2E2E2E;position:relative;'
+                'height:1px;margin:6px 0">'
+                '<span style="position:absolute;right:0;top:-9px;background:#111111;'
+                'padding:0 0 0 8px;font-family:\'DM Sans\',sans-serif;font-size:0.65rem;'
+                'font-weight:600;letter-spacing:0.1em;text-transform:uppercase;'
+                'color:#C8A96E;white-space:nowrap">Champion</span></div>'
                 "</td></tr>"
             )
         rank_cls = "rank-1" if rank == 1 else "rank-cell"
@@ -773,14 +775,25 @@ if "league_code" in df.columns:
         'color:#555555;margin-bottom:6px">Competition</p>',
         unsafe_allow_html=True,
     )
-    selected_league = st.sidebar.selectbox(
-        "Competition",
-        ["All"] + codes,
-        format_func=lambda x: "All competitions"
-        if x == "All"
-        else COMPETITION_NAMES.get(x, x),
-        label_visibility="collapsed",
-    )
+    if page == "Prediction":
+        selected_league = st.sidebar.selectbox(
+            "Competition",
+            codes,
+            index=codes.index("PL") if "PL" in codes else 0,
+            format_func=lambda x: COMPETITION_NAMES.get(x, x),
+            label_visibility="collapsed",
+            key="comp_pred",
+        )
+    else:
+        selected_league = st.sidebar.selectbox(
+            "Competition",
+            ["All"] + codes,
+            format_func=lambda x: "All competitions"
+            if x == "All"
+            else COMPETITION_NAMES.get(x, x),
+            label_visibility="collapsed",
+            key="comp_all",
+        )
     if selected_league != "All":
         df = df[df["league_code"] == selected_league]
 
@@ -977,37 +990,21 @@ elif page == "Standings":
 # ─────────────────────────────────────────────────────────────────────────────
 
 elif page == "Prediction":
-    pred_league = "PL" if selected_league == "All" else selected_league
-    pred_label = COMPETITION_NAMES.get(pred_league, pred_league)
+    competition_label = COMPETITION_NAMES.get(selected_league, selected_league)
 
     st.markdown(
-        f'<h1>{pred_label} — Prediction</h1>',
+        f'<h1>{competition_label} — Prediction</h1>',
         unsafe_allow_html=True,
     )
 
-    if selected_league == "All":
-        st.markdown(
-            '<p style="font-family:\'DM Sans\',sans-serif;font-size:0.75rem;'
-            'color:#888888;margin-top:2px;margin-bottom:20px">'
-            "Model trained on Premier League data</p>",
-            unsafe_allow_html=True,
-        )
-
     with st.spinner("Training model…"):
-        model, acc, baseline, df_feat = get_model(pred_league)
+        model, acc, baseline, df_feat = get_model(selected_league)
 
     if model is None:
         st.error("Not enough data to train the model for this selection.")
         st.stop()
 
-    if selected_league == "All":
-        _pl_df = load_data()
-        _pl_fin = _pl_df[
-            (_pl_df["league_code"] == "PL") & (_pl_df["status"] == "FINISHED")
-        ]
-        teams = sorted(_pl_fin["home_team"].dropna().unique().tolist())
-    else:
-        teams = sorted(finished["home_team"].dropna().unique().tolist())
+    teams = sorted(finished["home_team"].dropna().unique().tolist())
 
     col1, vs_col, col2 = st.columns([5, 2, 5])
     with col1:
