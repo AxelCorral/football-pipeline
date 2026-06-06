@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -22,6 +23,14 @@ COMPETITION_NAMES: dict[str, str] = {
     "BL1": "Bundesliga",
     "SA": "Serie A",
     "PD": "La Liga",
+}
+
+COMPETITION_FLAGS: dict[str, str] = {
+    "PL": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    "FL1": "🇫🇷",
+    "BL1": "🇩🇪",
+    "SA": "🇮🇹",
+    "PD": "🇪🇸",
 }
 
 TEAM_CRESTS: dict[str, str] = {
@@ -123,14 +132,315 @@ TEAM_CRESTS: dict[str, str] = {
     "Wolverhampton Wanderers FC": "https://crests.football-data.org/76.png",
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Page config
+# ─────────────────────────────────────────────────────────────────────────────
+
 st.set_page_config(
     page_title="Football Pipeline",
     page_icon="⚽",
     layout="wide",
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Global CSS
+# ─────────────────────────────────────────────────────────────────────────────
 
-# ── Data & model loading ───────────────────────────────────────────────────────
+_CSS = """
+<style>
+/* ── Global ── */
+* { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2A2A3A; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3A3A4A; }
+
+/* ── Backgrounds ── */
+.stApp, [data-testid="stAppViewContainer"] > .main,
+[data-testid="stAppViewBlock"] { background: #0A0A0F !important; }
+.block-container { padding-top: 2rem !important; }
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: #0D0D15 !important;
+    border-right: 1px solid #2A2A3A !important;
+}
+[data-testid="stSidebar"] > div { background: #0D0D15 !important; }
+
+/* ── Radio (nav) ── */
+[data-testid="stSidebar"] [data-baseweb="radio"] { gap: 6px; }
+[data-testid="stSidebar"] [data-baseweb="radio"] label {
+    color: #8B8FA8 !important;
+    font-size: 0.9rem;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: color 0.15s ease;
+}
+[data-testid="stSidebar"] [data-baseweb="radio"] label:hover { color: #FFFFFF !important; }
+[data-testid="stSidebar"] [data-baseweb="radio"] [aria-checked="true"] ~ div label,
+[data-testid="stSidebar"] [role="radio"][aria-checked="true"] + label {
+    color: #00FF87 !important;
+}
+
+/* ── Metrics ── */
+[data-testid="stMetricValue"] {
+    color: #00FF87 !important;
+    font-size: 1.8rem !important;
+    font-weight: 700 !important;
+}
+[data-testid="stMetricLabel"] { color: #8B8FA8 !important; font-size: 0.82rem !important; }
+[data-testid="stMetricDelta"] svg { display: none; }
+
+/* ── Primary button ── */
+[data-testid="baseButton-primary"] {
+    background: #00FF87 !important;
+    color: #0A0A0F !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    border: none !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.02em;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+[data-testid="baseButton-primary"]:hover {
+    background: #00e67a !important;
+    transform: translateY(-1px);
+}
+
+/* ── Divider ── */
+hr { border-color: #2A2A3A !important; margin: 20px 0 !important; }
+
+/* ── Headers ── */
+h1 { font-size: 1.9rem !important; font-weight: 800 !important; color: #FFFFFF !important; }
+h2 { font-size: 1.3rem !important; font-weight: 700 !important; color: #FFFFFF !important; }
+h3 { font-size: 1.05rem !important; font-weight: 600 !important; color: #FFFFFF !important; }
+
+/* ── KPI cards ── */
+.kpi-card {
+    background: #12121A;
+    border: 1px solid #2A2A3A;
+    border-radius: 12px;
+    padding: 22px 20px;
+    text-align: center;
+    transition: border-color 0.2s ease, transform 0.15s ease;
+    height: 100%;
+}
+.kpi-card:hover { border-color: #00FF87; transform: translateY(-2px); }
+.kpi-icon { font-size: 1.6rem; margin-bottom: 10px; }
+.kpi-value { color: #00FF87; font-size: 2rem; font-weight: 800; line-height: 1.1; }
+.kpi-label { color: #8B8FA8; font-size: 0.82rem; margin-top: 6px; letter-spacing: 0.02em; }
+
+/* ── League mini-cards ── */
+.league-card {
+    background: #12121A;
+    border: 1px solid #2A2A3A;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.2s ease;
+}
+.league-card:hover { border-color: #00B4FF; }
+.league-flag { font-size: 1.5rem; line-height: 1; }
+.league-name { color: #FFFFFF; font-weight: 600; font-size: 0.9rem; }
+.league-count { color: #8B8FA8; font-size: 0.78rem; margin-top: 2px; }
+
+/* ── Standings table ── */
+.standings-wrap { overflow-y: auto; max-height: 640px; border-radius: 10px; }
+.standings-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    background: #12121A;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.standings-table thead { position: sticky; top: 0; z-index: 1; }
+.standings-table th {
+    background: #0D0D15;
+    color: #8B8FA8;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 12px;
+    border-bottom: 1px solid #2A2A3A;
+    text-align: center;
+    white-space: nowrap;
+}
+.standings-table th.col-team { text-align: left; }
+.standings-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #1A1A26;
+    color: #FFFFFF;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.standings-table td.col-team { text-align: left; font-weight: 500; }
+.standings-table tr:last-child td { border-bottom: none; }
+.standings-table tbody tr:hover td { background: #1A1A26; }
+.standings-table .rank { color: #8B8FA8; font-size: 0.82rem; width: 28px; }
+.standings-table .pts { color: #00FF87; font-weight: 800; font-size: 0.95rem; }
+.standings-table img.crest {
+    width: 26px; height: 26px;
+    object-fit: contain;
+    vertical-align: middle;
+}
+.zone-cl { border-left: 3px solid #00FF87 !important; }
+.zone-el { border-left: 3px solid #00B4FF !important; }
+.zone-rel { border-left: 3px solid #FF4757 !important; }
+.zone-legend {
+    display: flex;
+    gap: 18px;
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: #8B8FA8;
+}
+.zone-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+/* ── Prob bars ── */
+.prob-block { margin: 16px 0; }
+.prob-row { margin: 10px 0; }
+.prob-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.prob-team { color: #FFFFFF; font-weight: 500; font-size: 0.92rem; }
+.prob-pct { color: #FFFFFF; font-weight: 700; font-size: 0.95rem; }
+.prob-track {
+    background: #1A1A26;
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+}
+.prob-fill { height: 8px; border-radius: 4px; transition: width 0.5s ease; }
+
+/* ── VS block ── */
+.vs-block {
+    text-align: center;
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #2A2A3A;
+    letter-spacing: -0.03em;
+    padding-top: 24px;
+    user-select: none;
+}
+
+/* ── Prediction badge ── */
+.pred-result {
+    text-align: center;
+    padding: 18px;
+    border-radius: 12px;
+    margin: 12px 0;
+}
+.pred-badge {
+    display: inline-block;
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+}
+.pred-h { background: rgba(0,255,135,0.12); color: #00FF87; border: 1px solid rgba(0,255,135,0.4); }
+.pred-d { background: rgba(255,184,0,0.12); color: #FFB800; border: 1px solid rgba(255,184,0,0.4); }
+.pred-a { background: rgba(255,71,87,0.12); color: #FF4757; border: 1px solid rgba(255,71,87,0.4); }
+
+/* ── Crest display (prediction) ── */
+.team-crest-center { text-align: center; margin: 10px 0 4px; }
+.team-crest-center img { width: 60px; height: 60px; object-fit: contain; }
+
+/* ── Timeline ── */
+.timeline { padding: 4px 0; }
+.tl-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 6px;
+}
+.tl-left { display: flex; flex-direction: column; align-items: center; }
+.tl-dot {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: #12121A;
+    border: 2px solid #00FF87;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.tl-line { width: 2px; flex: 1; min-height: 18px; background: linear-gradient(#00FF87, #2A2A3A); margin: 3px auto; }
+.tl-content { padding: 6px 0 16px; }
+.tl-title { color: #FFFFFF; font-weight: 600; font-size: 0.92rem; }
+.tl-desc { color: #8B8FA8; font-size: 0.82rem; margin-top: 3px; }
+
+/* ── Tech cards ── */
+.tech-card {
+    background: #12121A;
+    border: 1px solid #2A2A3A;
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: border-color 0.2s ease;
+    height: 100%;
+}
+.tech-card:hover { border-color: #00B4FF; }
+.tech-name { color: #FFFFFF; font-weight: 600; font-size: 0.88rem; }
+.tech-desc { color: #8B8FA8; font-size: 0.8rem; margin-top: 4px; }
+
+/* ── Link buttons ── */
+.link-btn {
+    display: inline-block;
+    padding: 9px 22px;
+    border-radius: 8px;
+    background: #12121A;
+    border: 1px solid #2A2A3A;
+    color: #FFFFFF !important;
+    text-decoration: none !important;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease, color 0.2s ease;
+    margin-right: 10px;
+}
+.link-btn:hover { border-color: #00FF87; color: #00FF87 !important; }
+
+/* ── Section title ── */
+.section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #8B8FA8;
+    margin-bottom: 14px;
+}
+</style>
+"""
+
+st.markdown(_CSS, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plotly base layout
+# ─────────────────────────────────────────────────────────────────────────────
+
+_PLOTLY = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#FFFFFF", family="system-ui"),
+    xaxis=dict(gridcolor="#1A1A26", linecolor="#2A2A3A", zerolinecolor="#2A2A3A"),
+    yaxis=dict(gridcolor="#1A1A26", linecolor="#2A2A3A", zerolinecolor="#2A2A3A"),
+    margin=dict(l=0, r=0, t=30, b=0),
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Data & model
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 @st.cache_data
@@ -163,7 +473,9 @@ def get_model(league_filter: str = "Toutes"):
     return _train(mtime, league_filter)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def compute_standings(finished: pd.DataFrame, mode: str) -> pd.DataFrame:
@@ -244,9 +556,95 @@ def build_prediction_row(
     )
 
 
-# ── Sidebar ────────────────────────────────────────────────────────────────────
+def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
+    n = len(standings)
+    header = (
+        '<thead><tr>'
+        '<th class="rank">#</th>'
+        '<th></th>'
+        '<th class="col-team">Équipe</th>'
+        '<th>J</th><th>V</th><th>N</th><th>D</th>'
+        '<th>BP</th><th>BC</th><th>+/−</th>'
+        '<th>Pts</th>'
+        '</tr></thead>'
+    )
+    rows_html = []
+    for i, row in standings.iterrows():
+        rank = i + 1
+        zone = ""
+        if with_zones:
+            if rank <= 4:
+                zone = "zone-cl"
+            elif rank == 5:
+                zone = "zone-el"
+            elif rank > n - 3:
+                zone = "zone-rel"
+        crest = TEAM_CRESTS.get(row["Équipe"], "")
+        img = f'<img class="crest" src="{crest}" alt="" loading="lazy">' if crest else ""
+        diff = row["Diff"]
+        diff_str = f"+{diff}" if diff > 0 else str(diff)
+        rows_html.append(
+            f'<tr class="{zone}">'
+            f'<td class="rank">{rank}</td>'
+            f'<td>{img}</td>'
+            f'<td class="col-team">{row["Équipe"]}</td>'
+            f'<td>{row["J"]}</td>'
+            f'<td>{row["G"]}</td>'
+            f'<td>{row["N"]}</td>'
+            f'<td>{row["P"]}</td>'
+            f'<td>{row["BP"]}</td>'
+            f'<td>{row["BC"]}</td>'
+            f'<td>{diff_str}</td>'
+            f'<td class="pts">{row["Pts"]}</td>'
+            f'</tr>'
+        )
+    table = (
+        '<div class="standings-wrap">'
+        f'<table class="standings-table">{header}<tbody>'
+        + "".join(rows_html)
+        + "</tbody></table></div>"
+    )
+    if with_zones:
+        legend = (
+            '<div class="zone-legend">'
+            '<span><span class="zone-dot" style="background:#00FF87"></span>Ligue des Champions (Top 4)</span>'
+            '<span><span class="zone-dot" style="background:#00B4FF"></span>Europa League (5e)</span>'
+            '<span><span class="zone-dot" style="background:#FF4757"></span>Relégation (3 derniers)</span>'
+            "</div>"
+        )
+        return table + legend
+    return table
 
-st.sidebar.title("⚽ Football Pipeline")
+
+def _prob_bar(label: str, team_name: str, prob: float, color: str) -> str:
+    pct = prob * 100
+    suffix = f" — {team_name}" if team_name and team_name != "—" else ""
+    return (
+        f'<div class="prob-row">'
+        f'<div class="prob-header">'
+        f'<span class="prob-team">{label}{suffix}</span>'
+        f'<span class="prob-pct">{pct:.1f}%</span>'
+        f'</div>'
+        f'<div class="prob-track">'
+        f'<div class="prob-fill" style="width:{pct:.1f}%;background:{color}"></div>'
+        f'</div>'
+        f'</div>'
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sidebar
+# ─────────────────────────────────────────────────────────────────────────────
+
+st.sidebar.markdown(
+    '<p style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin:0 0 2px">⚽ Football Pipeline</p>',
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown(
+    '<hr style="border-color:#2A2A3A;margin:10px 0 14px">',
+    unsafe_allow_html=True,
+)
+
 page = st.sidebar.radio(
     "Navigation",
     ["Vue d'ensemble", "Classement & Performance", "Prédiction", "À propos"],
@@ -262,22 +660,36 @@ if df.empty:
     )
     st.stop()
 
-# Competition filter — visible dès que la colonne league_code est présente
 selected_league = "Toutes"
 if "league_code" in df.columns:
     codes = sorted(df["league_code"].dropna().unique().tolist())
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**Compétition**")
+    st.sidebar.markdown(
+        '<hr style="border-color:#2A2A3A;margin:14px 0 10px">'
+        '<p style="color:#8B8FA8;font-size:0.72rem;font-weight:700;'
+        'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">'
+        "Compétition</p>",
+        unsafe_allow_html=True,
+    )
+
+    def _flag_label(x: str) -> str:
+        if x == "Toutes":
+            return "🌍  Toutes les compétitions"
+        return f"{COMPETITION_FLAGS.get(x, '')}  {COMPETITION_NAMES.get(x, x)}"
+
     selected_league = st.sidebar.selectbox(
         "Compétition",
         ["Toutes"] + codes,
-        format_func=lambda x: "Toutes les compétitions"
-        if x == "Toutes"
-        else COMPETITION_NAMES.get(x, x),
+        format_func=_flag_label,
         label_visibility="collapsed",
     )
     if selected_league != "Toutes":
         df = df[df["league_code"] == selected_league]
+
+st.sidebar.markdown(
+    '<hr style="border-color:#2A2A3A;margin:14px 0 10px">'
+    '<p style="color:#2A2A3A;font-size:0.72rem;text-align:center">v1.0 · 2025/26</p>',
+    unsafe_allow_html=True,
+)
 
 finished = df[df["status"] == "FINISHED"].copy()
 
@@ -288,32 +700,46 @@ competition_label = (
 )
 
 
-# ── Page 1 — Vue d'ensemble ───────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Page 1 — Vue d'ensemble
+# ─────────────────────────────────────────────────────────────────────────────
 
 if page == "Vue d'ensemble":
-    st.title(f"🏆 {competition_label} — Vue d'ensemble")
     st.markdown(
-        "**Problématique :** Prédire le résultat d'un match de football "
-        "(victoire domicile · nul · victoire extérieur) à partir de la forme "
-        "récente des équipes, via un pipeline ETL complet sur AWS "
-        "(S3 → Glue → Athena) et des modèles ML classiques (LR / Random Forest)."
+        f'<h1 style="margin-bottom:4px">🏆 {competition_label}</h1>'
+        '<p style="color:#8B8FA8;font-size:0.92rem;margin-top:0;margin-bottom:24px">'
+        "Pipeline ETL · AWS S3 / Glue / Athena · ML (LR / Random Forest)"
+        "</p>",
+        unsafe_allow_html=True,
     )
 
     total = len(finished)
     total_goals = int(finished["total_goals"].fillna(0).sum())
     pct_h = float((finished["result"] == "H").mean()) * 100
-    pct_d = float((finished["result"] == "D").mean()) * 100
-    pct_a = float((finished["result"] == "A").mean()) * 100
+    goals_per_match = total_goals / total if total else 0.0
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Matchs joués", f"{total:,}")
-    c2.metric("Buts totaux", f"{total_goals:,}")
-    c3.metric("% Victoires dom.", f"{pct_h:.1f}%")
-    c4.metric("% Nuls", f"{pct_d:.1f}%")
-    c5.metric("% Victoires ext.", f"{pct_a:.1f}%")
+    kpis = [
+        ("⚽", f"{total:,}", "Matchs analysés"),
+        ("🎯", f"{total_goals:,}", "Buts totaux"),
+        ("🏠", f"{pct_h:.1f}%", "Victoires domicile"),
+        ("📊", f"{goals_per_match:.2f}", "Buts / match"),
+    ]
+    cols = st.columns(4)
+    for col, (icon, value, label) in zip(cols, kpis):
+        col.markdown(
+            f'<div class="kpi-card">'
+            f'<div class="kpi-icon">{icon}</div>'
+            f'<div class="kpi-value">{value}</div>'
+            f'<div class="kpi-label">{label}</div>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
-    st.markdown("---")
-    st.subheader("Buts moyens par journée (semaine ISO)")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        '<p class="section-title">Buts moyens par semaine ISO</p>',
+        unsafe_allow_html=True,
+    )
 
     iso = finished["date"].dt.isocalendar()
     weekly = (
@@ -330,27 +756,66 @@ if page == "Vue d'ensemble":
         + weekly["week"].astype(str).str.zfill(2)
     )
 
-    fig = px.line(
-        weekly,
-        x="label",
-        y="buts_moyens",
-        hover_data={"nb_matchs": True, "label": False},
-        labels={
-            "label": "Semaine",
-            "buts_moyens": "Buts moyens",
-            "nb_matchs": "Matchs",
-        },
-        template="plotly_dark",
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=weekly["label"],
+            y=weekly["buts_moyens"],
+            mode="lines",
+            line=dict(color="#00B4FF", width=2.5),
+            fill="tozeroy",
+            fillcolor="rgba(0,180,255,0.08)",
+            hovertemplate="<b>%{y:.2f}</b> buts · %{customdata} matchs<extra></extra>",
+            customdata=weekly["nb_matchs"],
+        )
     )
-    fig.update_traces(line_color="#00d4ff", line_width=2)
-    fig.update_layout(xaxis_tickangle=-45, xaxis_title=None)
+    fig.update_layout(
+        **_PLOTLY,
+        height=280,
+        xaxis_tickangle=-45,
+        xaxis_title=None,
+        yaxis_title=None,
+        showlegend=False,
+    )
     st.plotly_chart(fig, use_container_width=True)
 
+    if "league_code" in finished.columns:
+        st.markdown(
+            '<p class="section-title" style="margin-top:8px">Par championnat</p>',
+            unsafe_allow_html=True,
+        )
+        league_stats = (
+            finished.groupby("league_code")
+            .size()
+            .reset_index(name="nb_matchs")
+        )
+        cols5 = st.columns(5)
+        for col, code in zip(cols5, ["PL", "FL1", "BL1", "SA", "PD"]):
+            row = league_stats[league_stats["league_code"] == code]
+            n_m = int(row["nb_matchs"].iloc[0]) if not row.empty else 0
+            flag = COMPETITION_FLAGS.get(code, "")
+            name = COMPETITION_NAMES.get(code, code)
+            col.markdown(
+                f'<div class="league-card">'
+                f'<span class="league-flag">{flag}</span>'
+                f'<div>'
+                f'<div class="league-name">{name}</div>'
+                f'<div class="league-count">{n_m} matchs</div>'
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
 
-# ── Page 2 — Classement & Performance ────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Page 2 — Classement & Performance
+# ─────────────────────────────────────────────────────────────────────────────
 
 elif page == "Classement & Performance":
-    st.title(f"📊 {competition_label} — Classement & Performance")
+    flag = COMPETITION_FLAGS.get(selected_league, "")
+    st.markdown(
+        f'<h1 style="margin-bottom:24px">📊 {flag} {competition_label}</h1>',
+        unsafe_allow_html=True,
+    )
 
     mode_label = st.radio(
         "Filtrer par :",
@@ -364,39 +829,54 @@ elif page == "Classement & Performance":
     }
     standings = compute_standings(finished, mode_map[mode_label])
 
-    st.markdown("### Classement")
-    display = standings.copy()
-    display.insert(0, "Logo", display["Équipe"].map(TEAM_CRESTS))
-    display.index = display.index + 1
-    st.dataframe(
-        display,
-        use_container_width=True,
-        height=580,
-        column_config={
-            "Logo": st.column_config.ImageColumn("", width="small"),
-        },
+    st.markdown(
+        '<p class="section-title" style="margin-top:20px">Classement</p>',
+        unsafe_allow_html=True,
     )
+    with_zones = selected_league != "Toutes"
+    st.markdown(_standings_html(standings, with_zones), unsafe_allow_html=True)
 
-    st.markdown("### Top 10 — Buts marqués")
-    top10 = standings.nlargest(10, "BP")[["Équipe", "BP"]].sort_values("BP")
-    fig2 = px.bar(
-        top10,
-        x="BP",
-        y="Équipe",
-        orientation="h",
-        labels={"BP": "Buts marqués", "Équipe": ""},
-        template="plotly_dark",
-        color="BP",
-        color_continuous_scale="Blues",
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        '<p class="section-title">Top 10 — Buts marqués</p>',
+        unsafe_allow_html=True,
     )
-    fig2.update_layout(coloraxis_showscale=False, yaxis_title=None)
+    top10 = standings.nlargest(10, "BP")[["Équipe", "BP"]].sort_values("BP")
+    fig2 = go.Figure(
+        go.Bar(
+            x=top10["BP"],
+            y=top10["Équipe"],
+            orientation="h",
+            marker=dict(
+                color=top10["BP"],
+                colorscale=[[0, "#005580"], [1, "#00B4FF"]],
+                showscale=False,
+            ),
+            text=top10["BP"],
+            textposition="outside",
+            textfont=dict(color="#FFFFFF", size=12),
+            hovertemplate="%{y}: <b>%{x}</b> buts<extra></extra>",
+        )
+    )
+    fig2.update_layout(
+        **_PLOTLY,
+        height=340,
+        xaxis_title=None,
+        yaxis_title=None,
+    )
     st.plotly_chart(fig2, use_container_width=True)
 
 
-# ── Page 3 — Prédiction ───────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Page 3 — Prédiction
+# ─────────────────────────────────────────────────────────────────────────────
 
 elif page == "Prédiction":
-    st.title(f"🤖 Prédiction — {competition_label}")
+    flag = COMPETITION_FLAGS.get(selected_league, "")
+    st.markdown(
+        f'<h1 style="margin-bottom:24px">🤖 Prédiction — {flag} {competition_label}</h1>',
+        unsafe_allow_html=True,
+    )
 
     with st.spinner("Entraînement du modèle…"):
         model, acc, baseline, df_feat = get_model(selected_league)
@@ -407,22 +887,28 @@ elif page == "Prédiction":
 
     teams = sorted(finished["home_team"].dropna().unique().tolist())
 
-    col1, col2 = st.columns(2)
+    col1, vs_col, col2 = st.columns([5, 2, 5])
     with col1:
-        ic, sc = st.columns([1, 5])
-        with sc:
-            home_team = st.selectbox("🏠 Équipe domicile", teams)
+        home_team = st.selectbox("🏠 Équipe domicile", teams)
         home_crest = TEAM_CRESTS.get(home_team)
         if home_crest:
-            ic.image(home_crest, width=60)
+            st.markdown(
+                f'<div class="team-crest-center"><img src="{home_crest}" alt="{home_team}"></div>',
+                unsafe_allow_html=True,
+            )
+    with vs_col:
+        st.markdown('<div class="vs-block">VS</div>', unsafe_allow_html=True)
     with col2:
-        sc, ic = st.columns([5, 1])
         away_options = [t for t in teams if t != home_team]
-        with sc:
-            away_team = st.selectbox("✈️ Équipe extérieure", away_options)
+        away_team = st.selectbox("✈️ Équipe extérieure", away_options)
         away_crest = TEAM_CRESTS.get(away_team)
         if away_crest:
-            ic.image(away_crest, width=60)
+            st.markdown(
+                f'<div class="team-crest-center"><img src="{away_crest}" alt="{away_team}"></div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("🔮 Prédire", use_container_width=True, type="primary"):
         X_pred = build_prediction_row(df_feat, home_team, away_team)
@@ -433,19 +919,37 @@ elif page == "Prédiction":
             )
         else:
             proba = model.predict_proba(X_pred[FEATURE_COLS].values.astype(float))[0]
-            # LABEL_MAP = {"H": 0, "D": 1, "A": 2} → proba[0]=H, [1]=D, [2]=A
-            outcomes = [
-                ("Victoire domicile", home_team, proba[0]),
-                ("Match nul", "—", proba[1]),
-                ("Victoire extérieur", away_team, proba[2]),
-            ]
+            # LABEL_MAP = {"H": 0, "D": 1, "A": 2}
 
-            st.markdown(f"### {home_team} vs {away_team}")
-            for label, team, prob in outcomes:
-                st.markdown(f"**{label}** {'— ' + team if team != '—' else ''}")
-                st.progress(float(prob), text=f"{prob:.1%}")
+            max_idx = int(proba.argmax())
+            if max_idx == 0:
+                badge_label, badge_class = f"{home_team} gagne", "pred-h"
+            elif max_idx == 1:
+                badge_label, badge_class = "Match nul probable", "pred-d"
+            else:
+                badge_label, badge_class = f"{away_team} gagne", "pred-a"
 
-            st.markdown("---")
+            st.markdown(
+                f'<div class="pred-result">'
+                f'<span style="color:#8B8FA8;font-size:0.85rem">Résultat prédit</span><br>'
+                f'<span class="pred-badge {badge_class}">{badge_label}</span>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            bars = (
+                _prob_bar("Victoire domicile", home_team, proba[0], "#00FF87")
+                + _prob_bar("Match nul", "—", proba[1], "#FFB800")
+                + _prob_bar("Victoire extérieur", away_team, proba[2], "#FF4757")
+            )
+            st.markdown(
+                f'<div class="prob-block">{bars}</div>', unsafe_allow_html=True
+            )
+
+            st.markdown(
+                '<hr style="border-color:#2A2A3A;margin:20px 0">',
+                unsafe_allow_html=True,
+            )
             ca, cb = st.columns(2)
             ca.metric("Accuracy du modèle", f"{acc:.1%}")
             cb.metric(
@@ -455,80 +959,92 @@ elif page == "Prédiction":
                 delta_color="normal",
             )
             st.caption(
-                "Le modèle compare Logistic Regression et Random Forest ; "
-                "le meilleur est retenu. Split temporel 80/20 sans shuffle."
+                "Logistic Regression vs Random Forest — le meilleur est retenu. "
+                "Split temporel 80/20 sans shuffle."
             )
 
 
-# ── Page 4 — À propos ─────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Page 4 — À propos
+# ─────────────────────────────────────────────────────────────────────────────
 
 elif page == "À propos":
-    st.title("ℹ️ À propos")
+    st.markdown(
+        '<h1 style="margin-bottom:24px">ℹ️ À propos</h1>',
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("""
-## Pipeline technique
+    st.markdown(
+        '<p class="section-title">Pipeline technique</p>',
+        unsafe_allow_html=True,
+    )
 
-Ce projet construit un pipeline ETL complet pour analyser et prédire les résultats
-de 5 grands championnats européens de football.
-
-### Compétitions couvertes
-
-| Code | Championnat |
-|------|-------------|
-| **PL** | Premier League (Angleterre) |
-| **FL1** | Ligue 1 (France) |
-| **BL1** | Bundesliga (Allemagne) |
-| **SA** | Serie A (Italie) |
-| **PD** | La Liga (Espagne) |
-
-### Architecture AWS
-
-| Composant | Rôle |
-|-----------|------|
-| **football-data.org API** | Source JSON des matchs |
-| **AWS S3 `raw/`** | Stockage des JSON bruts |
-| **Pandas / AWS Glue** | Transformation & normalisation Parquet |
-| **AWS S3 `curated/`** | Parquet optimisé pour requêtes |
-| **AWS Athena** | Requêtes SQL analytiques sur le lac de données |
-| **scikit-learn** | Modèles ML (Logistic Regression, Random Forest) |
-| **Streamlit** | Dashboard interactif (ce site) |
-
-### CI/CD GitLab
-
-Le pipeline est entièrement automatisé :
-
-```
-test   → pytest + coverage ≥ 70 %
-lint   → flake8 + black
-deploy → aws s3 sync vers le bucket curated
-```
-
-### Modèles ML
-
-- **Features** : forme glissante sur 5 matchs (buts marqués/concédés, points, avantage domicile)
-- **Split** : temporel 80/20 — aucun shuffle pour respecter l'ordre chronologique
-- **Sélection** : le modèle avec la meilleure accuracy test est retenu
-- **Labels** : H = victoire domicile · D = nul · A = victoire extérieur
-
-### Liens
-
-- 📁 **Repo** : `gitlab.com/<votre-username>/football-pipeline`
-- 📊 **Données** : [football-data.org](https://www.football-data.org)
-""")
-
-    st.markdown("---")
-    st.markdown("### Stack")
-    cols = st.columns(3)
-    stack = [
-        ("Python 3.12", "Langage principal"),
-        ("pandas 2.3", "Manipulation de données"),
-        ("scikit-learn", "Machine Learning"),
-        ("Streamlit", "Dashboard"),
-        ("Plotly", "Visualisations interactives"),
-        ("PyArrow", "Format Parquet"),
-        ("AWS S3 / Athena", "Storage & Analytics"),
-        ("GitLab CI/CD", "Automatisation"),
-        ("boto3", "SDK AWS Python"),
+    pipeline = [
+        ("🌐", "football-data.org API", "Source JSON — matchs, équipes, compétitions (v4)"),
+        ("📦", "AWS S3 raw/", "Stockage brut — un fichier JSON par journée de championnat"),
+        ("⚙️", "Pandas / AWS Glue", "Transformation, normalisation et enrichissement Parquet"),
+        ("🗄️", "AWS S3 curated/", "Parquet optimisé, partitionné par date (Hive-style)"),
+        ("🔍", "AWS Athena", "Requêtes SQL analytiques sur le lac de données"),
+        ("🤖", "scikit-learn ML", "LR / Random Forest — prédiction H · D · A"),
+        ("📊", "Streamlit", "Ce dashboard — déployé depuis GitHub"),
     ]
-    for i, (name, desc) in enumerate(stack):
-        cols[i % 3].markdown(f"**{name}** — {desc}")
+
+    tl_html = '<div class="timeline">'
+    for i, (icon, title, desc) in enumerate(pipeline):
+        is_last = i == len(pipeline) - 1
+        line_html = "" if is_last else '<div class="tl-line"></div>'
+        tl_html += (
+            f'<div class="tl-step">'
+            f'<div class="tl-left"><div class="tl-dot">{icon}</div>{line_html}</div>'
+            f'<div class="tl-content">'
+            f'<div class="tl-title">{title}</div>'
+            f'<div class="tl-desc">{desc}</div>'
+            f"</div></div>"
+        )
+    tl_html += "</div>"
+    st.markdown(tl_html, unsafe_allow_html=True)
+
+    st.markdown(
+        '<hr style="border-color:#2A2A3A;margin:28px 0 20px">'
+        '<p class="section-title">Stack technique</p>',
+        unsafe_allow_html=True,
+    )
+
+    tech_stack = [
+        ("🐍", "Python 3.12", "Langage principal"),
+        ("🐼", "pandas 2.x", "Manipulation de données"),
+        ("🧠", "scikit-learn", "Machine Learning"),
+        ("📈", "Streamlit", "Dashboard interactif"),
+        ("📉", "Plotly", "Visualisations"),
+        ("🗃️", "PyArrow", "Format Parquet"),
+        ("☁️", "AWS S3 / Glue", "Stockage & transformation"),
+        ("🔎", "AWS Athena", "SQL analytique"),
+        ("🔁", "GitLab CI/CD", "Lint → Test → Deploy"),
+    ]
+
+    tcols = st.columns(3)
+    for i, (emoji, name, desc) in enumerate(tech_stack):
+        tcols[i % 3].markdown(
+            f'<div class="tech-card" style="margin-bottom:10px">'
+            f'<div class="tech-name">{emoji} {name}</div>'
+            f'<div class="tech-desc">{desc}</div>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<hr style="border-color:#2A2A3A;margin:28px 0 20px">'
+        '<p class="section-title">Liens</p>'
+        '<a class="link-btn" href="https://github.com/AxelCorral/football-pipeline" target="_blank">'
+        "🐙 GitHub</a>"
+        '<a class="link-btn" href="https://www.football-data.org" target="_blank">'
+        "📊 football-data.org</a>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<br><p style="color:#8B8FA8;font-size:0.8rem">'
+        "Compétitions : 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League · 🇫🇷 Ligue 1 · 🇩🇪 Bundesliga · 🇮🇹 Serie A · 🇪🇸 La Liga"
+        "</p>",
+        unsafe_allow_html=True,
+    )
