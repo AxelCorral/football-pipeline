@@ -555,7 +555,7 @@ def _train(_cache_mtime: float, league_filter: str):
     df = load_data()
     if df.empty:
         return None, None, None, None
-    if league_filter != "Toutes" and "league_code" in df.columns:
+    if league_filter not in ("Toutes", "All") and "league_code" in df.columns:
         df = df[df["league_code"] == league_filter]
     df_feat = compute_features(df)
     baseline = baseline_accuracy(df)
@@ -977,19 +977,37 @@ elif page == "Standings":
 # ─────────────────────────────────────────────────────────────────────────────
 
 elif page == "Prediction":
+    pred_league = "PL" if selected_league == "All" else selected_league
+    pred_label = COMPETITION_NAMES.get(pred_league, pred_league)
+
     st.markdown(
-        f'<h1>{competition_label} — Prediction</h1>',
+        f'<h1>{pred_label} — Prediction</h1>',
         unsafe_allow_html=True,
     )
 
+    if selected_league == "All":
+        st.markdown(
+            '<p style="font-family:\'DM Sans\',sans-serif;font-size:0.75rem;'
+            'color:#888888;margin-top:2px;margin-bottom:20px">'
+            "Model trained on Premier League data</p>",
+            unsafe_allow_html=True,
+        )
+
     with st.spinner("Training model…"):
-        model, acc, baseline, df_feat = get_model(selected_league)
+        model, acc, baseline, df_feat = get_model(pred_league)
 
     if model is None:
         st.error("Not enough data to train the model for this selection.")
         st.stop()
 
-    teams = sorted(finished["home_team"].dropna().unique().tolist())
+    if selected_league == "All":
+        _pl_df = load_data()
+        _pl_fin = _pl_df[
+            (_pl_df["league_code"] == "PL") & (_pl_df["status"] == "FINISHED")
+        ]
+        teams = sorted(_pl_fin["home_team"].dropna().unique().tolist())
+    else:
+        teams = sorted(finished["home_team"].dropna().unique().tolist())
 
     col1, vs_col, col2 = st.columns([5, 2, 5])
     with col1:
