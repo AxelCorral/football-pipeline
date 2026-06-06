@@ -959,9 +959,60 @@ elif page == "Standings":
     mode_map = {"Home + Away": "both", "Home only": "home", "Away only": "away"}
     standings = compute_standings(finished, mode_map[mode_label])
 
+    stat_mode = st.radio(
+        "Stats",
+        ["Raw stats", "Per 90 min"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
     st.markdown('<span class="sl">Standings</span>', unsafe_allow_html=True)
-    with_zones = selected_league != "All"
-    st.markdown(_standings_html(standings, with_zones), unsafe_allow_html=True)
+
+    disp = standings.copy()
+    disp.insert(0, "Rank", range(1, len(disp) + 1))
+    disp["Crest"] = disp["Équipe"].map(TEAM_CRESTS)
+
+    if stat_mode == "Per 90 min":
+        played = disp["J"].where(disp["J"] > 0).astype(float)
+        disp["GF/90"] = (disp["BP"] / played).round(2)
+        disp["GA/90"] = (disp["BC"] / played).round(2)
+        disp["+/-/90"] = (disp["Diff"] / played).round(2)
+        display_cols = ["Rank", "Crest", "Équipe", "J", "G", "N", "P", "GF/90", "GA/90", "+/-/90", "Pts"]
+        col_cfg = {
+            "Rank": st.column_config.NumberColumn("#", width="small"),
+            "Crest": st.column_config.ImageColumn("", width="small"),
+            "Équipe": st.column_config.TextColumn("Team"),
+            "J": st.column_config.NumberColumn("M", width="small"),
+            "G": st.column_config.NumberColumn("W", width="small"),
+            "N": st.column_config.NumberColumn("D", width="small"),
+            "P": st.column_config.NumberColumn("L", width="small"),
+            "GF/90": st.column_config.NumberColumn("GF/90", format="%.2f", width="small"),
+            "GA/90": st.column_config.NumberColumn("GA/90", format="%.2f", width="small"),
+            "+/-/90": st.column_config.NumberColumn("+/−/90", format="%.2f", width="small"),
+            "Pts": st.column_config.NumberColumn("Pts", width="small"),
+        }
+    else:
+        display_cols = ["Rank", "Crest", "Équipe", "J", "G", "N", "P", "BP", "BC", "Diff", "Pts"]
+        col_cfg = {
+            "Rank": st.column_config.NumberColumn("#", width="small"),
+            "Crest": st.column_config.ImageColumn("", width="small"),
+            "Équipe": st.column_config.TextColumn("Team"),
+            "J": st.column_config.NumberColumn("M", width="small"),
+            "G": st.column_config.NumberColumn("W", width="small"),
+            "N": st.column_config.NumberColumn("D", width="small"),
+            "P": st.column_config.NumberColumn("L", width="small"),
+            "BP": st.column_config.NumberColumn("GF", width="small"),
+            "BC": st.column_config.NumberColumn("GA", width="small"),
+            "Diff": st.column_config.NumberColumn("+/−", width="small"),
+            "Pts": st.column_config.NumberColumn("Pts", width="small"),
+        }
+
+    st.dataframe(
+        disp[display_cols],
+        column_config=col_cfg,
+        use_container_width=True,
+        hide_index=True,
+    )
 
     st.markdown('<span class="sl">Top 10 — Goals scored</span>', unsafe_allow_html=True)
     top10 = standings.nlargest(10, "BP")[["Équipe", "BP"]].sort_values("BP")
