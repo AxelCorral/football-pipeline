@@ -366,8 +366,16 @@ elif page == "Classement & Performance":
 
     st.markdown("### Classement")
     display = standings.copy()
+    display.insert(0, "Logo", display["Équipe"].map(TEAM_CRESTS))
     display.index = display.index + 1
-    st.dataframe(display, use_container_width=True, height=580)
+    st.dataframe(
+        display,
+        use_container_width=True,
+        height=580,
+        column_config={
+            "Logo": st.column_config.ImageColumn("", width="small"),
+        },
+    )
 
     st.markdown("### Top 10 — Buts marqués")
     top10 = standings.nlargest(10, "BP")[["Équipe", "BP"]].sort_values("BP")
