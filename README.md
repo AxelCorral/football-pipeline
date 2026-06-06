@@ -7,7 +7,7 @@ Pipeline ETL complet qui collecte les données de matchs de **5 championnats eur
 
 ## Live Demo
 
-> **[STREAMLIT_URL]** — remplacer après déploiement sur Streamlit Cloud
+> **https://football-pipeline-axel.streamlit.app** — remplacer après déploiement sur Streamlit Cloud
 
 Le dashboard fonctionne entièrement hors-ligne grâce au cache Parquet versionné dans le repo (`data/cache/`).
 
