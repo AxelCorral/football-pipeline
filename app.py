@@ -24,6 +24,105 @@ COMPETITION_NAMES: dict[str, str] = {
     "PD": "La Liga",
 }
 
+TEAM_CRESTS: dict[str, str] = {
+    "1. FC Heidenheim 1846": "https://crests.football-data.org/44.png",
+    "1. FC Köln": "https://crests.football-data.org/1.png",
+    "1. FC Union Berlin": "https://crests.football-data.org/28.png",
+    "1. FSV Mainz 05": "https://crests.football-data.org/15.png",
+    "AC Milan": "https://crests.football-data.org/98.png",
+    "AC Pisa 1909": "https://crests.football-data.org/487.png",
+    "ACF Fiorentina": "https://crests.football-data.org/99.png",
+    "AFC Bournemouth": "https://crests.football-data.org/bournemouth.png",
+    "AJ Auxerre": "https://crests.football-data.org/519.png",
+    "AS Monaco FC": "https://crests.football-data.org/548.png",
+    "AS Roma": "https://crests.football-data.org/100.png",
+    "Angers SCO": "https://crests.football-data.org/532.png",
+    "Arsenal FC": "https://crests.football-data.org/57.png",
+    "Aston Villa FC": "https://crests.football-data.org/58.png",
+    "Atalanta BC": "https://crests.football-data.org/102.png",
+    "Athletic Club": "https://crests.football-data.org/77.png",
+    "Bayer 04 Leverkusen": "https://crests.football-data.org/3.png",
+    "Bologna FC 1909": "https://crests.football-data.org/103.png",
+    "Borussia Dortmund": "https://crests.football-data.org/4.png",
+    "Borussia Mönchengladbach": "https://crests.football-data.org/18.png",
+    "Brentford FC": "https://crests.football-data.org/402.png",
+    "Brighton & Hove Albion FC": "https://crests.football-data.org/397.png",
+    "Burnley FC": "https://crests.football-data.org/328.png",
+    "CA Osasuna": "https://crests.football-data.org/79.png",
+    "Cagliari Calcio": "https://crests.football-data.org/104.png",
+    "Chelsea FC": "https://crests.football-data.org/61.png",
+    "Club Atlético de Madrid": "https://crests.football-data.org/78.png",
+    "Como 1907": "https://crests.football-data.org/7397.png",
+    "Crystal Palace FC": "https://crests.football-data.org/354.png",
+    "Deportivo Alavés": "https://crests.football-data.org/263.png",
+    "Eintracht Frankfurt": "https://crests.football-data.org/19.png",
+    "Elche CF": "https://crests.football-data.org/285.png",
+    "Everton FC": "https://crests.football-data.org/62.png",
+    "FC Augsburg": "https://crests.football-data.org/16.png",
+    "FC Barcelona": "https://crests.football-data.org/81.png",
+    "FC Bayern München": "https://crests.football-data.org/5.png",
+    "FC Internazionale Milano": "https://crests.football-data.org/108.png",
+    "FC Lorient": "https://crests.football-data.org/525.png",
+    "FC Metz": "https://crests.football-data.org/545.png",
+    "FC Nantes": "https://crests.football-data.org/543.png",
+    "FC St. Pauli 1910": "https://crests.football-data.org/20.png",
+    "Fulham FC": "https://crests.football-data.org/63.png",
+    "Genoa CFC": "https://crests.football-data.org/107.png",
+    "Getafe CF": "https://crests.football-data.org/82.png",
+    "Girona FC": "https://crests.football-data.org/298.png",
+    "Hamburger SV": "https://crests.football-data.org/7.png",
+    "Hellas Verona FC": "https://crests.football-data.org/450.png",
+    "Juventus FC": "https://crests.football-data.org/109.png",
+    "Le Havre AC": "https://crests.football-data.org/533.png",
+    "Leeds United FC": "https://crests.football-data.org/341.png",
+    "Levante UD": "https://crests.football-data.org/88.png",
+    "Lille OSC": "https://crests.football-data.org/521.png",
+    "Liverpool FC": "https://crests.football-data.org/64.png",
+    "Manchester City FC": "https://crests.football-data.org/65.png",
+    "Manchester United FC": "https://crests.football-data.org/66.png",
+    "Newcastle United FC": "https://crests.football-data.org/67.png",
+    "Nottingham Forest FC": "https://crests.football-data.org/351.png",
+    "OGC Nice": "https://crests.football-data.org/522.png",
+    "Olympique Lyonnais": "https://crests.football-data.org/523.png",
+    "Olympique de Marseille": "https://crests.football-data.org/516.png",
+    "Paris FC": "https://crests.football-data.org/1045.png",
+    "Paris Saint-Germain FC": "https://crests.football-data.org/524.png",
+    "Parma Calcio 1913": "https://crests.football-data.org/112.png",
+    "RB Leipzig": "https://crests.football-data.org/721.png",
+    "RC Celta de Vigo": "https://crests.football-data.org/558.png",
+    "RC Strasbourg Alsace": "https://crests.football-data.org/576.png",
+    "RCD Espanyol de Barcelona": "https://crests.football-data.org/80.png",
+    "RCD Mallorca": "https://crests.football-data.org/89.png",
+    "Racing Club de Lens": "https://crests.football-data.org/546.png",
+    "Rayo Vallecano de Madrid": "https://crests.football-data.org/87.png",
+    "Real Betis Balompié": "https://crests.football-data.org/90.png",
+    "Real Madrid CF": "https://crests.football-data.org/86.png",
+    "Real Oviedo": "https://crests.football-data.org/1048.png",
+    "Real Sociedad de Fútbol": "https://crests.football-data.org/92.png",
+    "SC Freiburg": "https://crests.football-data.org/17.png",
+    "SS Lazio": "https://crests.football-data.org/110.png",
+    "SSC Napoli": "https://crests.football-data.org/113.png",
+    "SV Werder Bremen": "https://crests.football-data.org/12.png",
+    "Sevilla FC": "https://crests.football-data.org/559.png",
+    "Stade Brestois 29": "https://crests.football-data.org/512.png",
+    "Stade Rennais FC 1901": "https://crests.football-data.org/529.png",
+    "Sunderland AFC": "https://crests.football-data.org/71.png",
+    "TSG 1899 Hoffenheim": "https://crests.football-data.org/2.png",
+    "Torino FC": "https://crests.football-data.org/586.png",
+    "Tottenham Hotspur FC": "https://crests.football-data.org/73.png",
+    "Toulouse FC": "https://crests.football-data.org/511.png",
+    "US Cremonese": "https://crests.football-data.org/457.png",
+    "US Lecce": "https://crests.football-data.org/5890.png",
+    "US Sassuolo Calcio": "https://crests.football-data.org/471.png",
+    "Udinese Calcio": "https://crests.football-data.org/115.png",
+    "Valencia CF": "https://crests.football-data.org/95.png",
+    "VfB Stuttgart": "https://crests.football-data.org/10.png",
+    "VfL Wolfsburg": "https://crests.football-data.org/11.png",
+    "Villarreal CF": "https://crests.football-data.org/94.png",
+    "West Ham United FC": "https://crests.football-data.org/563.png",
+    "Wolverhampton Wanderers FC": "https://crests.football-data.org/76.png",
+}
+
 st.set_page_config(
     page_title="Football Pipeline",
     page_icon="⚽",
@@ -302,10 +401,20 @@ elif page == "Prédiction":
 
     col1, col2 = st.columns(2)
     with col1:
-        home_team = st.selectbox("🏠 Équipe domicile", teams)
+        ic, sc = st.columns([1, 5])
+        with sc:
+            home_team = st.selectbox("🏠 Équipe domicile", teams)
+        home_crest = TEAM_CRESTS.get(home_team)
+        if home_crest:
+            ic.image(home_crest, width=60)
     with col2:
+        sc, ic = st.columns([5, 1])
         away_options = [t for t in teams if t != home_team]
-        away_team = st.selectbox("✈️ Équipe extérieure", away_options)
+        with sc:
+            away_team = st.selectbox("✈️ Équipe extérieure", away_options)
+        away_crest = TEAM_CRESTS.get(away_team)
+        if away_crest:
+            ic.image(away_crest, width=60)
 
     if st.button("🔮 Prédire", use_container_width=True, type="primary"):
         X_pred = build_prediction_row(df_feat, home_team, away_team)
