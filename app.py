@@ -21,7 +21,7 @@ COMPETITION_NAMES: dict[str, str] = {
     "FL1": "Ligue 1",
     "BL1": "Bundesliga",
     "SA": "Serie A",
-    "PD": "Primera Division",
+    "PD": "La Liga",
 }
 
 st.set_page_config(
@@ -362,7 +362,7 @@ de 5 grands championnats européens de football.
 | **FL1** | Ligue 1 (France) |
 | **BL1** | Bundesliga (Allemagne) |
 | **SA** | Serie A (Italie) |
-| **PD** | Primera Division / Liga (Espagne) |
+| **PD** | La Liga (Espagne) |
 
 ### Architecture AWS
 
