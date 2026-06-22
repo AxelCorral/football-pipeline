@@ -64,10 +64,14 @@ def load_raw_from_s3(
     Returns:
         DataFrame aplati (``pd.json_normalize``) ; vide si aucun fichier.
     """
+    if not isinstance(bucket, str):
+        raise ValueError("Le nom du bucket S3 doit être une chaîne de caractères")
     bucket = bucket.strip()
     if not bucket:
         raise ValueError("Le nom du bucket S3 ne peut pas être vide")
 
+    if not isinstance(competition_code, str):
+        raise ValueError("Le code de compétition doit être une chaîne de caractères")
     competition_code = competition_code.strip()
     if not competition_code:
         raise ValueError("Le code de compétition ne peut pas être vide")
@@ -76,6 +80,8 @@ def load_raw_from_s3(
 
     if config is None:
         config = Config()
+    if not isinstance(config.aws_region, str):
+        raise ValueError("La région AWS doit être une chaîne de caractères")
     aws_region = config.aws_region.strip()
     if not aws_region:
         raise ValueError("La région AWS ne peut pas être vide")

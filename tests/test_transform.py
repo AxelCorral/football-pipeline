@@ -169,10 +169,24 @@ class TestGlueTransformer:
 class TestLoadRawFromS3:
     """Tests de la fonction load_raw_from_s3."""
 
+    def test_rejects_non_string_bucket_before_s3_call(self, config):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="bucket S3.*chaîne"):
+                load_raw_from_s3(None, "PL", config=config)
+
+        mock_client.assert_not_called()
+
     def test_rejects_empty_bucket_before_s3_call(self, config):
         with patch("src.transform.process_matches.boto3.client") as mock_client:
             with pytest.raises(ValueError, match="bucket S3"):
                 load_raw_from_s3(" ", "PL", config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_non_string_competition_before_s3_call(self, config):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="code de compétition.*chaîne"):
+                load_raw_from_s3("my-bucket", None, config=config)
 
         mock_client.assert_not_called()
 
@@ -190,6 +204,15 @@ class TestLoadRawFromS3:
         with patch("src.transform.process_matches.boto3.client") as mock_client:
             with pytest.raises(ValueError, match="séparateur"):
                 load_raw_from_s3("my-bucket", competition_code, config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_non_string_aws_region_before_s3_call(self, config):
+        config = replace(config, aws_region=None)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS.*chaîne"):
+                load_raw_from_s3("my-bucket", "PL", config=config)
 
         mock_client.assert_not_called()
 
