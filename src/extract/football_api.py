@@ -23,8 +23,15 @@ class FootballApiClient:
     BASE_URL = "https://api.football-data.org/v4"
 
     def __init__(self, settings: Config) -> None:
-        self.base_url = settings.football_api_base_url.rstrip("/")
-        self.headers = {"X-Auth-Token": settings.api_key}
+        self.base_url = settings.football_api_base_url.strip().rstrip("/")
+        if not self.base_url:
+            raise ValueError("L'URL de l'API football ne peut pas être vide")
+
+        api_key = settings.api_key.strip()
+        if not api_key:
+            raise ValueError("Le token de l'API football ne peut pas être vide")
+
+        self.headers = {"X-Auth-Token": api_key}
 
     def get_matches(
         self,

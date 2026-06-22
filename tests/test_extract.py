@@ -5,6 +5,7 @@ Couvre : initialisation du client, récupération de matchs,
 gestion des erreurs HTTP et format des paramètres de date.
 """
 
+from dataclasses import replace
 from datetime import date
 from unittest.mock import MagicMock, patch
 
@@ -16,6 +17,33 @@ from src.extract.football_api import FootballApiClient
 
 class TestFootballApiClient:
     """Tests du client API football-data.org."""
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("football_api_base_url", " / ", "URL de l'API football"),
+            ("api_key", " ", "token de l'API football"),
+        ],
+    )
+    def test_init_rejects_empty_http_configuration(
+        self, mock_settings, field, value, message
+    ):
+        settings = replace(mock_settings, **{field: value})
+
+        with pytest.raises(ValueError, match=message):
+            FootballApiClient(settings)
+
+    def test_init_normalizes_http_configuration(self, mock_settings):
+        settings = replace(
+            mock_settings,
+            football_api_base_url=" https://api.example.test/v4/ ",
+            api_key=" token ",
+        )
+
+        client = FootballApiClient(settings)
+
+        assert client.base_url == "https://api.example.test/v4"
+        assert client.headers == {"X-Auth-Token": "token"}
 
     def test_get_matches_returns_list(self, mock_settings):
         """get_matches doit retourner une liste."""
