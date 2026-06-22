@@ -80,7 +80,10 @@ def load_raw_from_s3(
                 continue
             logger.info("Lecture s3://%s/%s", bucket, key)
             body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
-            data = json.loads(body)
+            try:
+                data = json.loads(body)
+            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                raise ValueError(f"JSON invalide dans s3://{bucket}/{key}") from exc
             if isinstance(data, list):
                 all_matches.extend(data)
             else:

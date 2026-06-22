@@ -209,6 +209,20 @@ class TestLoadRawFromS3:
 
         mock_client.assert_called_once_with("s3", region_name="eu-west-1")
 
+    def test_invalid_json_error_identifies_s3_object(self, config):
+        key = "raw/PL/2024-03-15/matches.json"
+        mock_s3 = _mock_s3_with_content([{"Contents": [{"Key": key}]}])
+        body = MagicMock()
+        body.read.return_value = b"{invalid"
+        mock_s3.get_object.return_value = {"Body": body}
+
+        with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
+            with pytest.raises(
+                ValueError,
+                match=r"JSON invalide dans s3://my-bucket/raw/PL/2024-03-15/matches\.json",
+            ):
+                load_raw_from_s3("my-bucket", "PL", config=config)
+
 
 # ---------------------------------------------------------------------------
 # transform
