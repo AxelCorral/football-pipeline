@@ -112,7 +112,17 @@ def _request_with_retry(
             response = requests.get(url, headers=headers, params=params, timeout=30)
             response.raise_for_status()
 
-            matches: list[dict[str, Any]] = response.json().get("matches", [])
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Réponse API invalide : objet JSON attendu")
+
+            matches = payload.get("matches", [])
+            if not isinstance(matches, list) or not all(
+                isinstance(match, dict) for match in matches
+            ):
+                raise ValueError(
+                    "Réponse API invalide : 'matches' doit être une liste d'objets"
+                )
             logger.info("%d matchs récupérés depuis %s", len(matches), url)
             return matches
 

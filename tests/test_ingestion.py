@@ -47,11 +47,13 @@ def sample_matches() -> list[dict]:
     ]
 
 
-def _mock_response(status_code: int = 200, json_body: dict | None = None) -> MagicMock:
+def _mock_response(
+    status_code: int = 200, json_body: object | None = None
+) -> MagicMock:
     """Fabrique une fausse réponse requests."""
     resp = MagicMock()
     resp.status_code = status_code
-    resp.json.return_value = json_body or {}
+    resp.json.return_value = json_body if json_body is not None else {}
     if status_code >= 400:
         http_err = requests.HTTPError(response=resp)
         resp.raise_for_status.side_effect = http_err
@@ -114,6 +116,23 @@ class TestGetMatches:
             result = get_matches("PL", 2023, config=config)
 
         assert result == []
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            [],
+            {"matches": {}},
+            {"matches": ["not-a-match"]},
+        ],
+    )
+    def test_rejects_invalid_response_schema_without_retry(self, config, payload):
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(200, payload)
+
+            with pytest.raises(ValueError, match="Réponse API invalide"):
+                get_matches("PL", 2023, config=config)
+
+        assert mock_get.call_count == 1
 
     def test_raises_immediately_on_non_400_4xx(self, config):
         """Une erreur 4xx autre que 400 doit être levée sans retry ni fallback."""
