@@ -161,6 +161,13 @@ class TestTrainModel:
         with pytest.raises(ValueError, match="insuffisantes"):
             train_model(tiny, models_dir=tmp_path)
 
+    def test_raises_clear_error_on_unknown_result_label(self, df_features, tmp_path):
+        invalid = df_features.dropna(subset=FEATURE_COLS + ["result"]).copy()
+        invalid.loc[invalid.index[0], "result"] = "UNKNOWN"
+
+        with pytest.raises(ValueError, match="non supportés.*UNKNOWN"):
+            train_model(invalid, models_dir=tmp_path)
+
     def test_model_can_predict(self, df_features, tmp_path):
         model, _, _ = train_model(df_features, models_dir=tmp_path)
         assert hasattr(model, "predict")

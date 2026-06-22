@@ -53,6 +53,13 @@ def train_model(
             f"Données insuffisantes : {len(clean)} lignes valides (minimum 10)"
         )
 
+    unknown_labels = sorted(set(clean["result"]) - set(LABEL_MAP))
+    if unknown_labels:
+        raise ValueError(
+            "Labels de résultat non supportés : "
+            f"{unknown_labels}. Valeurs attendues : {sorted(LABEL_MAP)}"
+        )
+
     X = clean[FEATURE_COLS].values.astype(float)
     y = clean["result"].map(LABEL_MAP).values
 
