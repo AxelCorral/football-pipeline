@@ -53,6 +53,11 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
             finished[col] = pd.Series(dtype=float)
         return finished
 
+    invalid_results = finished.loc[~finished["result"].isin({"H", "D", "A"}), "result"]
+    if not invalid_results.empty:
+        labels = ", ".join(sorted({str(value) for value in invalid_results}))
+        raise ValueError(f"Labels de résultat non supportés : {labels}")
+
     def _roll(s: pd.Series) -> pd.Series:
         return s.shift(1).rolling(WINDOW, min_periods=1).mean()
 

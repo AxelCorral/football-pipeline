@@ -131,6 +131,14 @@ class TestComputeFeatures:
         with pytest.raises(ValueError, match=rf"absentes.*{missing_column}"):
             compute_features(incomplete)
 
+    @pytest.mark.parametrize("invalid_result", ["UNKNOWN", None])
+    def test_rejects_invalid_finished_result(self, df_matches, invalid_result):
+        invalid = df_matches.copy()
+        invalid.loc[invalid.index[0], "result"] = invalid_result
+
+        with pytest.raises(ValueError, match="résultat non supportés"):
+            compute_features(invalid)
+
 
 # ---------------------------------------------------------------------------
 # train_model
