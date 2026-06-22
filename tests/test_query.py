@@ -1,5 +1,6 @@
 """Tests unitaires du runner de requêtes Athena."""
 
+from dataclasses import replace
 from unittest.mock import MagicMock, call, patch
 
 import pandas as pd
@@ -10,6 +11,24 @@ from src.query.athena_query import AthenaQueryRunner
 
 class TestAthenaQueryRunner:
     """Vérifie la soumission, le polling et la pagination sans appel AWS."""
+
+    @pytest.mark.parametrize(
+        ("field", "message"),
+        [
+            ("athena_database", "base Athena"),
+            ("athena_output_s3", "emplacement S3"),
+        ],
+    )
+    @patch("src.query.athena_query.boto3.client")
+    def test_init_rejects_empty_athena_settings(
+        self, mock_client_factory, field, message, mock_settings
+    ):
+        settings = replace(mock_settings, **{field: " \n "})
+
+        with pytest.raises(ValueError, match=message):
+            AthenaQueryRunner(settings)
+
+        mock_client_factory.assert_not_called()
 
     @patch("src.query.athena_query.boto3.client")
     def test_run_query_returns_dataframe(self, mock_client_factory, mock_settings):

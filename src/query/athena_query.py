@@ -19,6 +19,11 @@ class AthenaQueryRunner:
     """Lance des requêtes SQL sur Athena et retourne les résultats."""
 
     def __init__(self, settings: Config) -> None:
+        if not settings.athena_database.strip():
+            raise ValueError("Le nom de la base Athena ne peut pas être vide")
+        if not settings.athena_output_s3.strip():
+            raise ValueError("L'emplacement S3 des résultats ne peut pas être vide")
+
         self.settings = settings
         self.client = boto3.client("athena", region_name=settings.aws_region)
 
