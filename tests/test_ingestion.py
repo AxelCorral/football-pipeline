@@ -456,6 +456,39 @@ class TestUploadToS3:
 class TestFetchAllCompetitions:
     """Tests de la fonction fetch_all_competitions."""
 
+    @pytest.mark.parametrize("competitions", ["PL", ("PL",), None])
+    def test_rejects_non_list_competitions(self, competitions, config):
+        """Une chaîne ne doit pas être parcourue caractère par caractère."""
+        with (
+            patch("src.ingestion.fetch_matches.get_matches") as mock_gm,
+            pytest.raises(ValueError, match="dans une liste"),
+        ):
+            fetch_all_competitions(competitions, config=config)
+
+        mock_gm.assert_not_called()
+
+    @pytest.mark.parametrize("competitions", [["PL", ""], ["PL", "  "], ["PL", 42]])
+    def test_rejects_invalid_code_before_any_request(self, competitions, config):
+        """Tous les codes sont validés avant le premier appel réseau."""
+        with (
+            patch("src.ingestion.fetch_matches.get_matches") as mock_gm,
+            pytest.raises(ValueError, match="index 1"),
+        ):
+            fetch_all_competitions(competitions, config=config)
+
+        mock_gm.assert_not_called()
+
+    def test_strips_competition_codes(self, config, sample_matches):
+        """Les espaces accidentels ne polluent pas les appels ni les clés."""
+        with patch(
+            "src.ingestion.fetch_matches.get_matches",
+            return_value=sample_matches,
+        ) as mock_gm:
+            result = fetch_all_competitions([" PL "], config=config)
+
+        mock_gm.assert_called_once_with("PL", season=None, config=config)
+        assert result == {"PL": sample_matches}
+
     def test_calls_get_matches_for_each_competition(self, config, sample_matches):
         """Doit appeler get_matches une fois par compétition."""
         competitions = ["PL", "FL1", "BL1"]

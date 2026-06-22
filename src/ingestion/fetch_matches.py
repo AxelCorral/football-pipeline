@@ -178,9 +178,21 @@ def fetch_all_competitions(
     Returns:
         Dict ``{code: [matchs]}`` — liste vide si la compétition a échoué.
     """
+    if not isinstance(competitions, list):
+        raise ValueError("Les compétitions doivent être fournies dans une liste")
+
+    normalized_competitions: list[str] = []
+    for index, code in enumerate(competitions):
+        if not isinstance(code, str) or not code.strip():
+            raise ValueError(
+                f"Code de compétition invalide à l'index {index} : "
+                "chaîne non vide attendue"
+            )
+        normalized_competitions.append(code.strip())
+
     results: dict[str, list[dict[str, Any]]] = {}
-    total = len(competitions)
-    for i, code in enumerate(competitions, 1):
+    total = len(normalized_competitions)
+    for i, code in enumerate(normalized_competitions, 1):
         name = COMPETITION_NAMES.get(code, code)
         logger.info("Ingestion %s — %s… (%d/%d)", code, name, i, total)
         try:
