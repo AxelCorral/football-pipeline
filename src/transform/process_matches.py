@@ -142,6 +142,8 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame normalisé avec types corrects.
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les données brutes doivent être un DataFrame pandas")
     if df.empty:
         return pd.DataFrame(columns=_OUTPUT_COLUMNS)
 

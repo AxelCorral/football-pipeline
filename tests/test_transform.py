@@ -379,6 +379,11 @@ class TestLoadRawFromS3:
 class TestTransform:
     """Tests de la fonction transform."""
 
+    @pytest.mark.parametrize("df", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, df):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            transform(df)
+
     def test_returns_dataframe(self, raw_df):
         assert isinstance(transform(raw_df), pd.DataFrame)
 
