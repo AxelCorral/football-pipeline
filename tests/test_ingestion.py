@@ -529,6 +529,11 @@ class TestBuildS3Key:
         with pytest.raises(ValueError, match="code de compétition"):
             build_s3_key(" ", date(2024, 3, 15))
 
+    @pytest.mark.parametrize("competition_code", ["PL/archive", r"PL\archive"])
+    def test_rejects_competition_code_path_separators(self, competition_code):
+        with pytest.raises(ValueError, match="séparateur"):
+            build_s3_key(competition_code, date(2024, 3, 15))
+
     def test_format_with_explicit_date(self):
         """La clé doit suivre le format raw/{code}/{date}/matches.json."""
         key = build_s3_key("PL", date(2024, 3, 15))

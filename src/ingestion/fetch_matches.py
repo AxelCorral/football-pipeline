@@ -206,6 +206,8 @@ def build_s3_key(competition_code: str, run_date: date | None = None) -> str:
     competition_code = competition_code.strip()
     if not competition_code:
         raise ValueError("Le code de compétition ne peut pas être vide")
+    if "/" in competition_code or "\\" in competition_code:
+        raise ValueError("Le code de compétition ne peut pas contenir de séparateur")
 
     if run_date is None:
         run_date = date.today()

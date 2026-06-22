@@ -702,6 +702,19 @@ class TestBuildCuratedKey:
         with pytest.raises(ValueError, match=message):
             build_curated_key(competition_code, season)
 
+    @pytest.mark.parametrize(
+        ("competition_code", "season"),
+        [
+            ("PL/archive", 2024),
+            (r"PL\archive", 2024),
+            ("PL", "2024/archive"),
+            ("PL", r"2024\archive"),
+        ],
+    )
+    def test_rejects_path_separators(self, competition_code, season):
+        with pytest.raises(ValueError, match="séparateur"):
+            build_curated_key(competition_code, season)
+
     def test_format_with_int_season(self):
         assert build_curated_key("PL", 2023) == "curated/PL/2023/matches.parquet"
 

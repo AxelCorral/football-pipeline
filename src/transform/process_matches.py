@@ -188,10 +188,14 @@ def build_curated_key(competition_code: str, season: int | str) -> str:
     competition_code = competition_code.strip()
     if not competition_code:
         raise ValueError("Le code de compétition ne peut pas être vide")
+    if "/" in competition_code or "\\" in competition_code:
+        raise ValueError("Le code de compétition ne peut pas contenir de séparateur")
 
     season = str(season).strip()
     if not season:
         raise ValueError("La saison ne peut pas être vide")
+    if "/" in season or "\\" in season:
+        raise ValueError("La saison ne peut pas contenir de séparateur")
 
     return f"curated/{competition_code}/{season}/matches.parquet"
 
