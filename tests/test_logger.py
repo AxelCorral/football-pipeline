@@ -22,7 +22,8 @@ def test_get_logger_reuses_existing_handler():
     logger = get_logger("tests.pipeline.reused")
     original_handler = logger.handlers[0]
 
-    reused_logger = get_logger("tests.pipeline.reused")
+    reused_logger = get_logger("tests.pipeline.reused", level=logging.DEBUG)
 
     assert reused_logger is logger
     assert reused_logger.handlers == [original_handler]
+    assert reused_logger.level == logging.DEBUG
