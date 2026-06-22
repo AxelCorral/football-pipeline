@@ -23,6 +23,14 @@ class GlueTransformer:
 
     def transform(self, raw_matches: list[dict[str, Any]]) -> pd.DataFrame:
         """Convertit une liste de matchs bruts en DataFrame normalisé."""
+        if not isinstance(raw_matches, list):
+            raise ValueError("Les matchs bruts doivent être fournis dans une liste")
+        for index, match in enumerate(raw_matches):
+            if not isinstance(match, dict):
+                raise ValueError(
+                    f"Match brut invalide à l'index {index} : objet attendu"
+                )
+
         normalized = normalize_matches(pd.json_normalize(raw_matches))
         if normalized.empty:
             return self._add_partition_columns(normalized)

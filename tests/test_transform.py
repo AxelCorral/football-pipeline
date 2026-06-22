@@ -129,6 +129,16 @@ class TestGlueTransformer:
         assert result.empty
         assert {"match_id", "date", "year", "month", "day"} <= set(result.columns)
 
+    @pytest.mark.parametrize("raw_matches", [None, {"id": 1}, "invalid"])
+    def test_transform_rejects_non_list_input(self, raw_matches):
+        with pytest.raises(ValueError, match="dans une liste"):
+            GlueTransformer().transform(raw_matches)
+
+    @pytest.mark.parametrize("invalid_match", [None, "invalid", 42])
+    def test_transform_rejects_non_object_match(self, invalid_match):
+        with pytest.raises(ValueError, match="index 1"):
+            GlueTransformer().transform([{"id": 1}, invalid_match])
+
     def test_flatten_match_extracts_team_names(self, sample_raw_matches):
         result = GlueTransformer()._flatten_match(sample_raw_matches[0])
 
