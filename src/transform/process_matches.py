@@ -219,6 +219,14 @@ def save_as_parquet(
     if df.empty:
         raise ValueError("Impossible de sauvegarder un DataFrame vide")
 
+    bucket = bucket.strip()
+    if not bucket:
+        raise ValueError("Le nom du bucket S3 ne peut pas être vide")
+
+    key = key.strip().strip("/")
+    if not key:
+        raise ValueError("La clé S3 ne peut pas être vide")
+
     if config is None:
         config = Config()
 

@@ -526,6 +526,24 @@ class TestTransform:
 class TestSaveAsParquet:
     """Tests de la fonction save_as_parquet."""
 
+    @pytest.mark.parametrize(
+        ("bucket", "key", "message"),
+        [
+            (" ", "curated/PL/2023/matches.parquet", "bucket S3"),
+            ("my-bucket", " / ", "clé S3"),
+        ],
+    )
+    def test_rejects_empty_s3_destination_before_client_creation(
+        self, config, raw_df, bucket, key, message
+    ):
+        df = transform(raw_df)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match=message):
+                save_as_parquet(df, bucket, key, config=config)
+
+        mock_client.assert_not_called()
+
     def test_calls_put_object_with_correct_bucket_and_key(self, config, raw_df):
         df = transform(raw_df)
         mock_s3 = MagicMock()
