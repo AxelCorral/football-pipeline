@@ -68,6 +68,10 @@ def load_raw_from_s3(
     if not bucket:
         raise ValueError("Le nom du bucket S3 ne peut pas être vide")
 
+    competition_code = competition_code.strip()
+    if not competition_code:
+        raise ValueError("Le code de compétition ne peut pas être vide")
+
     if config is None:
         config = Config()
 

@@ -165,6 +165,13 @@ class TestLoadRawFromS3:
 
         mock_client.assert_not_called()
 
+    def test_rejects_empty_competition_before_s3_call(self, config):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="code de compétition"):
+                load_raw_from_s3("my-bucket", " ", config=config)
+
+        mock_client.assert_not_called()
+
     def test_returns_dataframe_with_rows(self, config, raw_match):
         mock_s3 = _mock_s3_with_content(
             [{"Contents": [{"Key": "raw/PL/2024-03-15/matches.json"}]}]
