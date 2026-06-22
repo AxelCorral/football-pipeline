@@ -622,6 +622,17 @@ class TestSaveAsParquet:
 class TestBuildCuratedKey:
     """Tests de la fonction build_curated_key."""
 
+    @pytest.mark.parametrize(
+        ("competition_code", "season", "message"),
+        [
+            (" ", 2024, "code de compétition"),
+            ("PL", " ", "saison"),
+        ],
+    )
+    def test_rejects_empty_key_components(self, competition_code, season, message):
+        with pytest.raises(ValueError, match=message):
+            build_curated_key(competition_code, season)
+
     def test_format_with_int_season(self):
         assert build_curated_key("PL", 2023) == "curated/PL/2023/matches.parquet"
 
