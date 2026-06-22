@@ -539,6 +539,10 @@ class TestBuildS3Key:
         key = build_s3_key("PL", date(2024, 3, 15))
         assert key == "raw/PL/2024-03-15/matches.json"
 
+    def test_rejects_invalid_run_date(self):
+        with pytest.raises(ValueError, match="date de collecte S3"):
+            build_s3_key("PL", "2024-03-15")
+
     def test_uses_today_when_no_date(self):
         """Sans date explicite, la date du jour doit être utilisée."""
         with patch("src.ingestion.fetch_matches.date") as mock_date:

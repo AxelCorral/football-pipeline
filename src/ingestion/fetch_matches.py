@@ -211,6 +211,8 @@ def build_s3_key(competition_code: str, run_date: date | None = None) -> str:
 
     if run_date is None:
         run_date = date.today()
+    elif not isinstance(run_date, date):
+        raise ValueError("La date de collecte S3 doit être une date")
     return f"raw/{competition_code}/{run_date.isoformat()}/matches.json"
 
 
