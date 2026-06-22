@@ -14,10 +14,13 @@ Pour un backfill multi-saisons explicite, voir scripts/ingest_all.py.
 import logging
 from datetime import date
 
+import pandas as pd
+
 from src.config import Config
 from src.ingestion.fetch_matches import fetch_all_competitions, upload_to_s3
 from src.transform.process_matches import (
     build_curated_key,
+    filter_by_season,
     load_raw_from_s3,
     save_as_parquet,
     transform,
@@ -72,11 +75,14 @@ def run_pipeline(config: Config) -> dict[str, int]:
                 continue
 
             df = transform(df_raw)
+            available_seasons = pd.to_numeric(df["season"], errors="coerce").dropna()
             season = (
-                int(df["season"].dropna().iloc[0])
-                if df["season"].notna().any()
+                int(available_seasons.max())
+                if not available_seasons.empty
                 else date.today().year
             )
+            if not available_seasons.empty:
+                df = filter_by_season(df, season)
             key = build_curated_key(code, season)
             save_as_parquet(df, config.aws_bucket_name, key, config=config)
             summary[code] = len(df)

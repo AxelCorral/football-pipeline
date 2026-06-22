@@ -141,3 +141,29 @@ class TestRunPipeline:
 
         key_arg = mock_save.call_args.args[2]
         assert str(date.today().year) in key_arg
+
+    @patch("src.main.save_as_parquet")
+    @patch("src.main.transform")
+    @patch("src.main.load_raw_from_s3")
+    @patch("src.main.upload_to_s3")
+    @patch("src.main.fetch_all_competitions")
+    def test_keeps_only_latest_available_season(
+        self, mock_fetch, mock_upload, mock_load, mock_transform, mock_save, config
+    ):
+        mock_fetch.return_value = {"PL": [{"id": 1}]}
+        mock_load.return_value = _raw_df(3)
+        mock_transform.return_value = pd.DataFrame(
+            {
+                "season": [2024, 2025, 2025],
+                "home_team": ["A", "B", "C"],
+                "away_team": ["D", "E", "F"],
+            }
+        )
+
+        with patch("src.main.COMPETITIONS", ["PL"]):
+            result = run_pipeline(config)
+
+        saved_df = mock_save.call_args.args[0]
+        assert saved_df["season"].tolist() == [2025, 2025]
+        assert mock_save.call_args.args[2] == "curated/PL/2025/matches.parquet"
+        assert result == {"PL": 2}
