@@ -734,6 +734,16 @@ class TestSaveAsParquet:
 class TestBuildCuratedKey:
     """Tests de la fonction build_curated_key."""
 
+    @pytest.mark.parametrize("competition_code", [None, 42, object()])
+    def test_rejects_non_string_competition_code(self, competition_code):
+        with pytest.raises(ValueError, match="chaîne de caractères"):
+            build_curated_key(competition_code, 2024)
+
+    @pytest.mark.parametrize("season", [None, 2024.0, True, object()])
+    def test_rejects_invalid_season_type(self, season):
+        with pytest.raises(ValueError, match="entier ou une chaîne"):
+            build_curated_key("PL", season)
+
     @pytest.mark.parametrize(
         ("competition_code", "season", "message"),
         [
@@ -773,6 +783,11 @@ class TestBuildCuratedKey:
 
 class TestFilterBySeason:
     """Tests du filtrage empêchant de mélanger les saisons."""
+
+    @pytest.mark.parametrize("df", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, df):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            filter_by_season(df, 2025)
 
     def test_filters_integer_and_string_seasons(self):
         df = pd.DataFrame(

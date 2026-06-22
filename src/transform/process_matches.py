@@ -193,6 +193,11 @@ def build_curated_key(competition_code: str, season: int | str) -> str:
 
     Format : ``curated/{competition_code}/{season}/matches.parquet``
     """
+    if not isinstance(competition_code, str):
+        raise ValueError("Le code de compétition doit être une chaîne de caractères")
+    if isinstance(season, bool) or not isinstance(season, (int, str)):
+        raise ValueError("La saison doit être un entier ou une chaîne de caractères")
+
     competition_code = competition_code.strip()
     if not competition_code:
         raise ValueError("Le code de compétition ne peut pas être vide")
@@ -210,6 +215,8 @@ def build_curated_key(competition_code: str, season: int | str) -> str:
 
 def filter_by_season(df: pd.DataFrame, season: int | str) -> pd.DataFrame:
     """Retourne uniquement les matchs de la saison demandée."""
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les matchs à filtrer doivent être un DataFrame pandas")
     if "season" not in df.columns:
         raise ValueError("Colonne 'season' absente du DataFrame transformé")
 
