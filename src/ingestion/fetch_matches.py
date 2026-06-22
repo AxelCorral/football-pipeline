@@ -69,8 +69,15 @@ def get_matches(
     if config is None:
         config = Config()
 
-    url = f"{config.football_api_base_url}/competitions/{competition_code}/matches"
-    headers = {"X-Auth-Token": config.api_key}
+    base_url = config.football_api_base_url.strip().rstrip("/")
+    if not base_url:
+        raise ValueError("L'URL de l'API football ne peut pas être vide")
+    api_key = config.api_key.strip()
+    if not api_key:
+        raise ValueError("Le token de l'API football ne peut pas être vide")
+
+    url = f"{base_url}/competitions/{competition_code}/matches"
+    headers = {"X-Auth-Token": api_key}
     params: dict[str, Any] = {"season": season} if season is not None else {}
 
     try:

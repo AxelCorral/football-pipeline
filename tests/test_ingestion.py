@@ -73,6 +73,39 @@ class TestGetMatches:
 
         mock_get.assert_not_called()
 
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("football_api_base_url", " / ", "URL de l'API football"),
+            ("api_key", " \n ", "token de l'API football"),
+        ],
+    )
+    def test_rejects_empty_http_configuration_before_request(
+        self, config, field, value, message
+    ):
+        config = replace(config, **{field: value})
+
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            with pytest.raises(ValueError, match=message):
+                get_matches("PL", config=config)
+
+        mock_get.assert_not_called()
+
+    def test_normalizes_http_configuration(self, config):
+        config = replace(
+            config,
+            football_api_base_url=" https://api.football-data.org/v4/// ",
+            api_key=" test-api-key ",
+        )
+
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(200, {"matches": []})
+            get_matches("PL", config=config)
+
+        url, kwargs = mock_get.call_args
+        assert url[0] == "https://api.football-data.org/v4/competitions/PL/matches"
+        assert kwargs["headers"]["X-Auth-Token"] == "test-api-key"
+
     def test_returns_matches_list(self, config, sample_matches):
         """Doit retourner la liste 'matches' du payload API."""
         with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
