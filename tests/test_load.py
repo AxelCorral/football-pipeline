@@ -1,5 +1,6 @@
 """Tests unitaires pour src/load/s3_loader.py."""
 
+from dataclasses import replace
 from datetime import date
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +12,15 @@ from src.load.s3_loader import S3Loader
 
 class TestS3Loader:
     """Tests du chargeur S3."""
+
+    def test_init_rejects_empty_bucket_name(self, mock_settings):
+        settings = replace(mock_settings, aws_bucket_name=" ")
+
+        with patch("src.load.s3_loader.boto3.client") as boto3_client:
+            with pytest.raises(ValueError, match="bucket S3"):
+                S3Loader(settings)
+
+        boto3_client.assert_not_called()
 
     def test_build_s3_key_hive_partitioning(self, mock_settings):
         with patch("src.load.s3_loader.boto3.client"):

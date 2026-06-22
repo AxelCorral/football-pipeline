@@ -22,7 +22,9 @@ class S3Loader:
     """Upload des DataFrames pandas vers S3 en format Parquet."""
 
     def __init__(self, settings: Config) -> None:
-        self.bucket = settings.aws_bucket_name
+        self.bucket = settings.aws_bucket_name.strip()
+        if not self.bucket:
+            raise ValueError("Le nom du bucket S3 ne peut pas être vide")
         self.s3 = boto3.client("s3", region_name=settings.aws_region)
 
     def upload_dataframe(
