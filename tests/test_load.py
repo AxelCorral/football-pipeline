@@ -55,6 +55,18 @@ class TestS3Loader:
         with pytest.raises(ValueError, match=message):
             loader._build_s3_key(prefix, date(2024, 3, 5), filename)
 
+    @pytest.mark.parametrize(
+        "filename", ["archive/matches.parquet", r"archive\matches"]
+    )
+    def test_build_s3_key_rejects_filename_path_separators(
+        self, mock_settings, filename
+    ):
+        with patch("src.load.s3_loader.boto3.client"):
+            loader = S3Loader(mock_settings)
+
+        with pytest.raises(ValueError, match="séparateur"):
+            loader._build_s3_key("curated", date(2024, 3, 5), filename)
+
     def test_upload_dataframe_calls_s3_put_object(self, mock_settings):
         settings = replace(mock_settings, aws_region=" eu-west-1 ")
         s3 = MagicMock()

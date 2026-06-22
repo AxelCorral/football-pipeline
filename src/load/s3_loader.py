@@ -64,6 +64,8 @@ class S3Loader:
             raise ValueError("Le préfixe S3 ne peut pas être vide")
         if not clean_filename:
             raise ValueError("Le nom de fichier S3 ne peut pas être vide")
+        if "/" in clean_filename or "\\" in clean_filename:
+            raise ValueError("Le nom de fichier S3 ne peut pas contenir de séparateur")
 
         return (
             f"{clean_prefix}/year={partition_date.year}"
