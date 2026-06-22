@@ -741,3 +741,10 @@ class TestFilterBySeason:
     def test_raises_when_season_column_is_missing(self):
         with pytest.raises(ValueError, match="Colonne 'season' absente"):
             filter_by_season(pd.DataFrame({"match_id": [1]}), 2025)
+
+    @pytest.mark.parametrize("season", ["", " \n ", "unknown", None])
+    def test_rejects_invalid_requested_season(self, season):
+        df = pd.DataFrame({"match_id": [1], "season": [2025]})
+
+        with pytest.raises(ValueError, match="saison doit être une année entière"):
+            filter_by_season(df, season)

@@ -201,8 +201,13 @@ def filter_by_season(df: pd.DataFrame, season: int | str) -> pd.DataFrame:
     if "season" not in df.columns:
         raise ValueError("Colonne 'season' absente du DataFrame transformé")
 
+    try:
+        requested_season = int(str(season).strip())
+    except (TypeError, ValueError) as exc:
+        raise ValueError("La saison doit être une année entière") from exc
+
     normalized_season = pd.to_numeric(df["season"], errors="coerce")
-    return df.loc[normalized_season.eq(int(season))].copy()
+    return df.loc[normalized_season.eq(requested_season)].copy()
 
 
 def save_as_parquet(
