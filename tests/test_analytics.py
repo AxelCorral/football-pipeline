@@ -18,7 +18,12 @@ from src.analytics.athena_queries import (
 def test_run_athena_query_submits_configured_request(
     mock_client_factory, mock_wait, mock_settings
 ):
-    config = replace(mock_settings, aws_region=" eu-west-1 ")
+    config = replace(
+        mock_settings,
+        aws_region=" eu-west-1 ",
+        athena_database=" football ",
+        athena_output_s3=" s3://bucket/results/ ",
+    )
     client = mock_client_factory.return_value
     client.start_query_execution.return_value = {"QueryExecutionId": "query-123"}
 
@@ -33,8 +38,8 @@ def test_run_athena_query_submits_configured_request(
     mock_client_factory.assert_called_once_with("athena", region_name="eu-west-1")
     client.start_query_execution.assert_called_once_with(
         QueryString="SELECT 1",
-        QueryExecutionContext={"Database": config.athena_database},
-        ResultConfiguration={"OutputLocation": config.athena_output_s3},
+        QueryExecutionContext={"Database": "football"},
+        ResultConfiguration={"OutputLocation": "s3://bucket/results/"},
     )
     mock_wait.assert_called_once_with(client, "query-123")
 
@@ -138,7 +143,7 @@ def test_results_to_dataframe_handles_pagination_and_nulls(
         {"ResultSet": {"Rows": [{"Data": [{"VarCharValue": "Liverpool"}, {}]}]}},
     ]
 
-    result = results_to_dataframe("query-123", config=config)
+    result = results_to_dataframe(" query-123 ", config=config)
 
     mock_client_factory.assert_called_once_with("athena", region_name="eu-west-1")
     pd.testing.assert_frame_equal(

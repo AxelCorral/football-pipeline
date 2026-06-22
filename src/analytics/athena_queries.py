@@ -62,9 +62,11 @@ def run_athena_query(
     """
     if not query.strip():
         raise ValueError("La requête SQL ne peut pas être vide")
-    if not database.strip():
+    database = database.strip()
+    if not database:
         raise ValueError("Le nom de la base Athena ne peut pas être vide")
-    if not output_s3.strip():
+    output_s3 = output_s3.strip()
+    if not output_s3:
         raise ValueError("L'emplacement S3 des résultats ne peut pas être vide")
 
     if config is None:
@@ -107,7 +109,8 @@ def results_to_dataframe(
         DataFrame dont toutes les colonnes sont de type ``object`` (str / None).
         Appeler ``pd.to_numeric``, ``pd.to_datetime``, etc. pour convertir.
     """
-    if not query_execution_id.strip():
+    query_execution_id = query_execution_id.strip()
+    if not query_execution_id:
         raise ValueError("L'identifiant d'exécution Athena ne peut pas être vide")
 
     if config is None:
