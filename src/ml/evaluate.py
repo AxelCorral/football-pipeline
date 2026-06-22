@@ -14,7 +14,19 @@ def baseline_accuracy(df: pd.DataFrame) -> float:
     Returns:
         Fraction de matchs FINISHED remportés à domicile. 0.0 si aucun match.
     """
+    required_columns = {"status", "result"}
+    missing_columns = required_columns.difference(df.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"Colonnes requises absentes : {missing}")
+
     finished = df[df["status"] == "FINISHED"]
     if finished.empty:
         return 0.0
+
+    invalid_results = finished.loc[~finished["result"].isin({"H", "D", "A"}), "result"]
+    if not invalid_results.empty:
+        labels = ", ".join(sorted({str(value) for value in invalid_results}))
+        raise ValueError(f"Labels de résultat non supportés : {labels}")
+
     return float((finished["result"] == "H").mean())

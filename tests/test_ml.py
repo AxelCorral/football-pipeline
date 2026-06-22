@@ -214,6 +214,22 @@ class TestBaselineAccuracy:
         empty = pd.DataFrame(columns=["status", "result"])
         assert baseline_accuracy(empty) == 0.0
 
+    @pytest.mark.parametrize("missing_column", ["status", "result"])
+    def test_rejects_missing_required_column(self, missing_column):
+        df = pd.DataFrame({"status": ["FINISHED"], "result": ["H"]}).drop(
+            columns=missing_column
+        )
+
+        with pytest.raises(ValueError, match=rf"absentes.*{missing_column}"):
+            baseline_accuracy(df)
+
+    @pytest.mark.parametrize("invalid_result", ["UNKNOWN", None])
+    def test_rejects_invalid_finished_result(self, invalid_result):
+        df = pd.DataFrame({"status": ["FINISHED"], "result": [invalid_result]})
+
+        with pytest.raises(ValueError, match="résultat non supportés"):
+            baseline_accuracy(df)
+
     def test_all_home_wins(self):
         df = pd.DataFrame({"status": ["FINISHED"] * 4, "result": ["H"] * 4})
         assert baseline_accuracy(df) == pytest.approx(1.0)
