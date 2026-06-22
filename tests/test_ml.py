@@ -156,6 +156,15 @@ class TestTrainModel:
         with pytest.raises(TypeError, match="DataFrame pandas"):
             train_model(invalid_input, models_dir=tmp_path)
 
+    @pytest.mark.parametrize("missing_column", FEATURE_COLS + ["result"])
+    def test_rejects_missing_required_column(
+        self, df_features, missing_column, tmp_path
+    ):
+        incomplete = df_features.drop(columns=missing_column)
+
+        with pytest.raises(ValueError, match=rf"absentes.*{missing_column}"):
+            train_model(incomplete, models_dir=tmp_path)
+
     def test_returns_model_accuracy_cm(self, df_features, tmp_path):
         model, acc, cm = train_model(df_features, models_dir=tmp_path)
         assert model is not None

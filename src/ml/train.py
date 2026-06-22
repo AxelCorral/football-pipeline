@@ -50,6 +50,12 @@ def train_model(
     if not isinstance(df_features, pd.DataFrame):
         raise TypeError("Les features doivent être fournies dans un DataFrame pandas")
 
+    required_columns = set(FEATURE_COLS) | {"result"}
+    missing_columns = required_columns.difference(df_features.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"Colonnes requises absentes : {missing}")
+
     clean = df_features.dropna(subset=FEATURE_COLS + ["result"]).copy()
     if len(clean) < 10:
         raise ValueError(
