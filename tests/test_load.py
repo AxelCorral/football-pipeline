@@ -110,3 +110,16 @@ class TestS3Loader:
 
         with pytest.raises(ValueError, match="DataFrame vide"):
             loader.upload_dataframe(pd.DataFrame(), "curated", date(2024, 3, 5))
+
+    @pytest.mark.parametrize("invalid_data", [None, [], {"match_id": [1]}])
+    def test_upload_rejects_non_dataframe_before_s3_call(
+        self, mock_settings, invalid_data
+    ):
+        s3 = MagicMock()
+        with patch("src.load.s3_loader.boto3.client", return_value=s3):
+            loader = S3Loader(mock_settings)
+
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            loader.upload_dataframe(invalid_data, "curated", date(2024, 3, 5))
+
+        s3.put_object.assert_not_called()

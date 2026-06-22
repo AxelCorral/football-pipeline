@@ -38,6 +38,8 @@ class S3Loader:
         filename: str = "data.parquet",
     ) -> str:
         """Sérialise df en Parquet et l'uploade sur S3. Retourne l'URI S3."""
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError("Les données à uploader doivent être un DataFrame pandas")
         if df.empty:
             raise ValueError("Impossible d'uploader un DataFrame vide")
 
