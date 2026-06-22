@@ -146,6 +146,14 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     out["referee"] = _extract_referee(df)
     out["venue"] = _col(df, "venue")
 
+    duplicate_ids = out["match_id"].notna() & out["match_id"].duplicated(keep="last")
+    if duplicate_ids.any():
+        logger.info(
+            "Transform : %d snapshot(s) dupliqué(s) ignoré(s)",
+            duplicate_ids.sum(),
+        )
+        out = out.loc[~duplicate_ids].copy()
+
     logger.info(
         "Transform : %d lignes (%d avec score, %d sans)",
         len(out),

@@ -444,6 +444,29 @@ class TestTransform:
         out = transform(df)
         assert len(out) == 2
 
+    def test_duplicate_match_ids_keep_latest_snapshot(self, raw_match):
+        scheduled = dict(raw_match)
+        scheduled["status"] = "SCHEDULED"
+        scheduled["score"] = {"fullTime": {"home": None, "away": None}}
+
+        out = transform(pd.json_normalize([scheduled, raw_match]))
+
+        assert len(out) == 1
+        assert out.iloc[0]["match_id"] == raw_match["id"]
+        assert out.iloc[0]["status"] == "FINISHED"
+        assert out.iloc[0]["result"] == "H"
+
+    def test_rows_without_match_id_are_not_deduplicated(self):
+        first = _scheduled_match()
+        second = _scheduled_match()
+        first.pop("id")
+        second.pop("id")
+        second["homeTeam"] = {"name": "Team C"}
+
+        out = transform(pd.json_normalize([first, second]))
+
+        assert len(out) == 2
+
     def test_competition_code_none_when_field_absent(self):
         """competition.code absent de la réponse → colonne None, pas d'erreur."""
         df = pd.json_normalize(
