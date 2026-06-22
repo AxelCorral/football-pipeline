@@ -270,6 +270,23 @@ class TestLoadRawFromS3:
             ):
                 load_raw_from_s3("my-bucket", "PL", config=config)
 
+    def test_rejects_non_list_json_with_s3_location(self, config):
+        key = "raw/PL/2024-03-15/matches.json"
+        mock_s3 = _mock_s3_with_content([{"Contents": [{"Key": key}]}])
+        body = MagicMock()
+        body.read.return_value = json.dumps({"matches": []}).encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": body}
+
+        with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
+            with pytest.raises(
+                ValueError,
+                match=(
+                    r"Format JSON invalide dans s3://my-bucket/"
+                    r"raw/PL/2024-03-15/matches\.json : liste attendue, dict reçu"
+                ),
+            ):
+                load_raw_from_s3("my-bucket", "PL", config=config)
+
     def test_rejects_non_object_match_with_s3_location(self, config):
         key = "raw/PL/2024-03-15/matches.json"
         mock_s3 = _mock_s3_with_content([{"Contents": [{"Key": key}]}])

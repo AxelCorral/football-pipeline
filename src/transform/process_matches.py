@@ -93,12 +93,11 @@ def load_raw_from_s3(
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
                 raise ValueError(f"JSON invalide dans s3://{bucket}/{key}") from exc
             if not isinstance(data, list):
-                logger.warning(
-                    "Format inattendu dans %s (attendu list, reçu %s)",
-                    key,
-                    type(data).__name__,
+                raise ValueError(
+                    "Format JSON invalide dans "
+                    f"s3://{bucket}/{key} : liste attendue, "
+                    f"{type(data).__name__} reçu"
                 )
-                continue
 
             for index, match in enumerate(data):
                 if not isinstance(match, dict):
