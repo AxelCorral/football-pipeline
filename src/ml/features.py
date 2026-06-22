@@ -18,6 +18,15 @@ FEATURE_COLS = [
     "away_conceded_avg",
     "home_advantage",
 ]
+REQUIRED_COLUMNS = {
+    "date",
+    "status",
+    "result",
+    "home_team",
+    "away_team",
+    "home_goals",
+    "away_goals",
+}
 
 
 def compute_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -32,6 +41,11 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame filtré sur FINISHED, trié par date, avec FEATURE_COLS ajoutées.
         Les premiers matchs d'une équipe peuvent avoir des NaN (historique vide).
     """
+    missing_columns = REQUIRED_COLUMNS.difference(df.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"Colonnes requises absentes : {missing}")
+
     finished = df[df["status"] == "FINISHED"].sort_values("date").copy()
 
     if finished.empty:

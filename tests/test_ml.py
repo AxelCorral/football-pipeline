@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from src.ml.evaluate import baseline_accuracy
-from src.ml.features import FEATURE_COLS, compute_features
+from src.ml.features import FEATURE_COLS, REQUIRED_COLUMNS, compute_features
 from src.ml.train import LABEL_MAP, train_model
 
 # ---------------------------------------------------------------------------
@@ -122,6 +122,13 @@ class TestComputeFeatures:
         assert result.empty
         for col in FEATURE_COLS:
             assert col in result.columns
+
+    @pytest.mark.parametrize("missing_column", sorted(REQUIRED_COLUMNS))
+    def test_rejects_missing_required_column(self, df_matches, missing_column):
+        incomplete = df_matches.drop(columns=missing_column)
+
+        with pytest.raises(ValueError, match=rf"absentes.*{missing_column}"):
+            compute_features(incomplete)
 
 
 # ---------------------------------------------------------------------------
