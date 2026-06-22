@@ -23,6 +23,8 @@ class AthenaQueryRunner:
             raise ValueError("Le nom de la base Athena ne peut pas être vide")
         if not settings.athena_output_s3.strip():
             raise ValueError("L'emplacement S3 des résultats ne peut pas être vide")
+        if not settings.aws_region.strip():
+            raise ValueError("La région AWS ne peut pas être vide")
 
         self.settings = settings
         self.client = boto3.client("athena", region_name=settings.aws_region)

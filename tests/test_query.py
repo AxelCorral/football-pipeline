@@ -17,6 +17,7 @@ class TestAthenaQueryRunner:
         [
             ("athena_database", "base Athena"),
             ("athena_output_s3", "emplacement S3"),
+            ("aws_region", "région AWS"),
         ],
     )
     @patch("src.query.athena_query.boto3.client")
