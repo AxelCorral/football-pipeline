@@ -208,7 +208,19 @@ def test_wait_for_completion_raises_failed_reason(mock_sleep):
     with pytest.raises(RuntimeError, match="FAILED.*SQL invalide"):
         _wait_for_completion(client, "query-failed")
 
-    mock_sleep.assert_called_once()
+    mock_sleep.assert_not_called()
+
+
+@patch("src.analytics.athena_queries.time.sleep")
+def test_wait_for_completion_checks_success_before_sleeping(mock_sleep):
+    client = type("Client", (), {})()
+    client.get_query_execution = lambda **_: {
+        "QueryExecution": {"Status": {"State": "SUCCEEDED"}}
+    }
+
+    _wait_for_completion(client, "query-succeeded")
+
+    mock_sleep.assert_not_called()
 
 
 @patch("src.analytics.athena_queries.MAX_WAIT_SECONDS", 2)

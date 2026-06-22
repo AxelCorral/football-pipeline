@@ -193,10 +193,7 @@ def _wait_for_completion(client, query_execution_id: str) -> None:
     secondes jusqu'à atteindre un état terminal.
     """
     elapsed = 0
-    while elapsed < MAX_WAIT_SECONDS:
-        time.sleep(POLL_INTERVAL_SECONDS)
-        elapsed += POLL_INTERVAL_SECONDS
-
+    while elapsed <= MAX_WAIT_SECONDS:
         resp = client.get_query_execution(QueryExecutionId=query_execution_id)
         status = resp["QueryExecution"]["Status"]
         state: str = status["State"]
@@ -223,6 +220,11 @@ def _wait_for_completion(client, query_execution_id: str) -> None:
                 f"Requête Athena {query_execution_id[:8]} "
                 f"terminée en état {state} : {reason}"
             )
+
+        if elapsed == MAX_WAIT_SECONDS:
+            break
+        time.sleep(POLL_INTERVAL_SECONDS)
+        elapsed = min(elapsed + POLL_INTERVAL_SECONDS, MAX_WAIT_SECONDS)
 
     raise TimeoutError(
         f"Requête Athena {query_execution_id[:8]} toujours en cours "
