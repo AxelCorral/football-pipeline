@@ -23,6 +23,14 @@ class FootballApiClient:
     BASE_URL = "https://api.football-data.org/v4"
 
     def __init__(self, settings: Config) -> None:
+        if not isinstance(settings.football_api_base_url, str):
+            raise ValueError(
+                "L'URL de l'API football doit être une chaîne de caractères"
+            )
+        if not isinstance(settings.api_key, str):
+            raise ValueError(
+                "Le token de l'API football doit être une chaîne de caractères"
+            )
         self.base_url = settings.football_api_base_url.strip().rstrip("/")
         if not self.base_url:
             raise ValueError("L'URL de l'API football ne peut pas être vide")

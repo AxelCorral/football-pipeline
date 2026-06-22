@@ -21,6 +21,21 @@ class TestFootballApiClient:
     @pytest.mark.parametrize(
         ("field", "value", "message"),
         [
+            ("football_api_base_url", None, "URL de l'API football.*chaîne"),
+            ("api_key", 123, "token de l'API football.*chaîne"),
+        ],
+    )
+    def test_init_rejects_non_string_http_configuration(
+        self, mock_settings, field, value, message
+    ):
+        settings = replace(mock_settings, **{field: value})
+
+        with pytest.raises(ValueError, match=message):
+            FootballApiClient(settings)
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
             ("football_api_base_url", " / ", "URL de l'API football"),
             ("api_key", " ", "token de l'API football"),
         ],
