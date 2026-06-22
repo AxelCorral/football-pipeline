@@ -22,6 +22,15 @@ class TestS3Loader:
 
         boto3_client.assert_not_called()
 
+    def test_init_rejects_empty_aws_region(self, mock_settings):
+        settings = replace(mock_settings, aws_region=" \n ")
+
+        with patch("src.load.s3_loader.boto3.client") as boto3_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                S3Loader(settings)
+
+        boto3_client.assert_not_called()
+
     def test_build_s3_key_hive_partitioning(self, mock_settings):
         with patch("src.load.s3_loader.boto3.client"):
             loader = S3Loader(mock_settings)

@@ -25,6 +25,8 @@ class S3Loader:
         self.bucket = settings.aws_bucket_name.strip()
         if not self.bucket:
             raise ValueError("Le nom du bucket S3 ne peut pas être vide")
+        if not settings.aws_region.strip():
+            raise ValueError("La région AWS ne peut pas être vide")
         self.s3 = boto3.client("s3", region_name=settings.aws_region)
 
     def upload_dataframe(
