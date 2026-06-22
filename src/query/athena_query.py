@@ -19,15 +19,19 @@ class AthenaQueryRunner:
     """Lance des requêtes SQL sur Athena et retourne les résultats."""
 
     def __init__(self, settings: Config) -> None:
-        if not settings.athena_database.strip():
+        athena_database = settings.athena_database.strip()
+        if not athena_database:
             raise ValueError("Le nom de la base Athena ne peut pas être vide")
-        if not settings.athena_output_s3.strip():
+        athena_output_s3 = settings.athena_output_s3.strip()
+        if not athena_output_s3:
             raise ValueError("L'emplacement S3 des résultats ne peut pas être vide")
         aws_region = settings.aws_region.strip()
         if not aws_region:
             raise ValueError("La région AWS ne peut pas être vide")
 
         self.settings = settings
+        self.athena_database = athena_database
+        self.athena_output_s3 = athena_output_s3
         self.client = boto3.client("athena", region_name=aws_region)
 
     def run_query(self, sql: str) -> pd.DataFrame:
@@ -37,8 +41,8 @@ class AthenaQueryRunner:
 
         response = self.client.start_query_execution(
             QueryString=sql,
-            QueryExecutionContext={"Database": self.settings.athena_database},
-            ResultConfiguration={"OutputLocation": self.settings.athena_output_s3},
+            QueryExecutionContext={"Database": self.athena_database},
+            ResultConfiguration={"OutputLocation": self.athena_output_s3},
         )
         query_execution_id = response["QueryExecutionId"]
         self._wait_for_query(query_execution_id)

@@ -64,6 +64,11 @@ class TestAthenaQueryRunner:
     def test_run_query_calls_start_query_execution(
         self, mock_client_factory, mock_settings
     ):
+        mock_settings = replace(
+            mock_settings,
+            athena_database=" football ",
+            athena_output_s3=" s3://bucket/results/ ",
+        )
         client = mock_client_factory.return_value
         client.start_query_execution.return_value = {"QueryExecutionId": "query-123"}
         runner = AthenaQueryRunner(mock_settings)
@@ -74,8 +79,8 @@ class TestAthenaQueryRunner:
 
         client.start_query_execution.assert_called_once_with(
             QueryString="SELECT count(*) FROM matches",
-            QueryExecutionContext={"Database": mock_settings.athena_database},
-            ResultConfiguration={"OutputLocation": mock_settings.athena_output_s3},
+            QueryExecutionContext={"Database": "football"},
+            ResultConfiguration={"OutputLocation": "s3://bucket/results/"},
         )
         runner._wait_for_query.assert_called_once_with("query-123")
         runner._fetch_results.assert_called_once_with("query-123")
