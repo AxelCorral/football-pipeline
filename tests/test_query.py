@@ -59,6 +59,15 @@ class TestAthenaQueryRunner:
         runner._fetch_results.assert_called_once_with("query-123")
 
     @patch("src.query.athena_query.boto3.client")
+    def test_run_query_rejects_empty_sql(self, mock_client_factory, mock_settings):
+        client = mock_client_factory.return_value
+
+        with pytest.raises(ValueError, match="requête SQL"):
+            AthenaQueryRunner(mock_settings).run_query(" \n ")
+
+        client.start_query_execution.assert_not_called()
+
+    @patch("src.query.athena_query.boto3.client")
     def test_wait_for_query_raises_on_failed_status(
         self, mock_client_factory, mock_settings
     ):

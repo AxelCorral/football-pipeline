@@ -24,6 +24,9 @@ class AthenaQueryRunner:
 
     def run_query(self, sql: str) -> pd.DataFrame:
         """Soumet une requête, attend sa réussite et retourne ses résultats."""
+        if not sql.strip():
+            raise ValueError("La requête SQL ne peut pas être vide")
+
         response = self.client.start_query_execution(
             QueryString=sql,
             QueryExecutionContext={"Database": self.settings.athena_database},
