@@ -173,6 +173,16 @@ class TestLoadRawFromS3:
 
         mock_client.assert_not_called()
 
+    @pytest.mark.parametrize("competition_code", ["PL/2024", r"PL\2024"])
+    def test_rejects_competition_path_separators_before_s3_call(
+        self, competition_code, config
+    ):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="séparateur"):
+                load_raw_from_s3("my-bucket", competition_code, config=config)
+
+        mock_client.assert_not_called()
+
     def test_rejects_empty_aws_region_before_s3_call(self, config):
         config = replace(config, aws_region=" \n ")
 

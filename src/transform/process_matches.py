@@ -71,6 +71,8 @@ def load_raw_from_s3(
     competition_code = competition_code.strip()
     if not competition_code:
         raise ValueError("Le code de compétition ne peut pas être vide")
+    if "/" in competition_code or "\\" in competition_code:
+        raise ValueError("Le code de compétition ne peut pas contenir de séparateur")
 
     if config is None:
         config = Config()
