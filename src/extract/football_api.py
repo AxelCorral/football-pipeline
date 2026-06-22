@@ -40,7 +40,14 @@ class FootballApiClient:
             timeout=30,
         )
         response.raise_for_status()
-        return response.json().get("matches", [])
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Réponse API invalide : objet JSON attendu")
+
+        matches = payload.get("matches", [])
+        if not isinstance(matches, list):
+            raise ValueError("Réponse API invalide : 'matches' doit être une liste")
+        return matches
 
     def get_competition(self, competition_id: int) -> dict[str, Any]:
         """Retourne les métadonnées d'une compétition."""
@@ -50,4 +57,7 @@ class FootballApiClient:
             timeout=30,
         )
         response.raise_for_status()
-        return response.json()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Réponse API invalide : objet JSON attendu")
+        return payload

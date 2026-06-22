@@ -71,6 +71,24 @@ class TestFootballApiClient:
                     2021, date(2024, 1, 1), date(2024, 1, 31)
                 )
 
+    @pytest.mark.parametrize(
+        ("payload", "message"),
+        [
+            ([], "objet JSON attendu"),
+            ({"matches": {}}, "'matches' doit être une liste"),
+        ],
+    )
+    def test_get_matches_rejects_invalid_payload(self, mock_settings, payload, message):
+        """Une réponse JSON mal formée doit produire une erreur explicite."""
+        response = MagicMock()
+        response.json.return_value = payload
+
+        with patch("src.extract.football_api.requests.get", return_value=response):
+            with pytest.raises(ValueError, match=message):
+                FootballApiClient(mock_settings).get_matches(
+                    2021, date(2024, 1, 1), date(2024, 1, 31)
+                )
+
     def test_get_competition_returns_dict(self, mock_settings):
         """get_competition doit retourner un dictionnaire."""
         response = MagicMock()
@@ -80,3 +98,12 @@ class TestFootballApiClient:
             competition = FootballApiClient(mock_settings).get_competition(2021)
 
         assert competition == {"id": 2021, "name": "Premier League"}
+
+    def test_get_competition_rejects_non_object_payload(self, mock_settings):
+        """Les métadonnées de compétition doivent être un objet JSON."""
+        response = MagicMock()
+        response.json.return_value = []
+
+        with patch("src.extract.football_api.requests.get", return_value=response):
+            with pytest.raises(ValueError, match="objet JSON attendu"):
+                FootballApiClient(mock_settings).get_competition(2021)
