@@ -41,6 +41,9 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame filtré sur FINISHED, trié par date, avec FEATURE_COLS ajoutées.
         Les premiers matchs d'une équipe peuvent avoir des NaN (historique vide).
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les données de matchs doivent être un DataFrame pandas")
+
     missing_columns = REQUIRED_COLUMNS.difference(df.columns)
     if missing_columns:
         missing = ", ".join(sorted(missing_columns))

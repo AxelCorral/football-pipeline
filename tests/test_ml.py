@@ -75,6 +75,11 @@ def df_features(df_matches):
 
 
 class TestComputeFeatures:
+    @pytest.mark.parametrize("invalid_input", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, invalid_input):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            compute_features(invalid_input)
+
     def test_filters_to_finished_only(self, df_with_unfinished):
         result = compute_features(df_with_unfinished)
         assert (result["status"] == "FINISHED").all()
