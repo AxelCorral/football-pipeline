@@ -117,9 +117,17 @@ def results_to_dataframe(
         result_rows = resp["ResultSet"]["Rows"]
 
         if columns is None:
-            # Première page : la ligne 0 contient les noms de colonnes.
-            columns = [cell.get("VarCharValue", "") for cell in result_rows[0]["Data"]]
-            result_rows = result_rows[1:]
+            metadata = resp["ResultSet"].get("ResultSetMetadata", {})
+            column_info = metadata.get("ColumnInfo", [])
+            columns = [column["Name"] for column in column_info]
+
+            # Athena inclut normalement l'en-tête comme première ligne.
+            if result_rows:
+                if not columns:
+                    columns = [
+                        cell.get("VarCharValue", "") for cell in result_rows[0]["Data"]
+                    ]
+                result_rows = result_rows[1:]
             logger.info(
                 "Colonnes Athena (%d) : %s",
                 len(columns),
@@ -128,7 +136,9 @@ def results_to_dataframe(
 
         for row in result_rows:
             # cell vide ({}) → NULL Athena → None dans le DataFrame
-            rows.append([cell.get("VarCharValue") for cell in row["Data"]])
+            values = [cell.get("VarCharValue") for cell in row.get("Data", [])]
+            values = (values + [None] * len(columns))[: len(columns)]
+            rows.append(values)
 
         next_token = resp.get("NextToken")
         if not next_token:
