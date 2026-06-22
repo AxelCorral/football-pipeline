@@ -98,6 +98,22 @@ class TestFootballApiClient:
 
         mock_get.assert_not_called()
 
+    @pytest.mark.parametrize(
+        ("date_from", "date_to", "message"),
+        [
+            ("2024-01-01", date(2024, 1, 31), "date_from doit être une date"),
+            (date(2024, 1, 1), None, "date_to doit être une date"),
+        ],
+    )
+    def test_get_matches_rejects_invalid_date_types(
+        self, mock_settings, date_from, date_to, message
+    ):
+        with patch("src.extract.football_api.requests.get") as mock_get:
+            with pytest.raises(ValueError, match=message):
+                FootballApiClient(mock_settings).get_matches(2021, date_from, date_to)
+
+        mock_get.assert_not_called()
+
     @pytest.mark.parametrize("competition_id", [0, -1, True, "2021"])
     def test_get_matches_rejects_invalid_competition_id(
         self, mock_settings, competition_id

@@ -41,6 +41,8 @@ class FootballApiClient:
     ) -> list[dict[str, Any]]:
         """Retourne les matchs d'une compétition pour une plage de dates."""
         _validate_competition_id(competition_id)
+        _validate_date("date_from", date_from)
+        _validate_date("date_to", date_to)
         if date_from > date_to:
             raise ValueError("date_from doit être antérieure ou égale à date_to")
 
@@ -83,3 +85,9 @@ def _validate_competition_id(competition_id: int) -> None:
         or competition_id <= 0
     ):
         raise ValueError("competition_id doit être un entier strictement positif")
+
+
+def _validate_date(name: str, value: date) -> None:
+    """Rejette les valeurs qui ne peuvent pas former un paramètre de date API."""
+    if not isinstance(value, date):
+        raise ValueError(f"{name} doit être une date")
