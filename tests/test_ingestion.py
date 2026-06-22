@@ -66,6 +66,13 @@ def _mock_response(
 class TestGetMatches:
     """Tests de la fonction get_matches."""
 
+    def test_rejects_non_string_competition_before_http_call(self, config):
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            with pytest.raises(ValueError, match="code de compétition.*chaîne"):
+                get_matches(None, config=config)
+
+        mock_get.assert_not_called()
+
     def test_rejects_empty_competition_before_http_call(self, config):
         with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
             with pytest.raises(ValueError, match="code de compétition"):
@@ -81,6 +88,28 @@ class TestGetMatches:
         ],
     )
     def test_rejects_empty_http_configuration_before_request(
+        self, config, field, value, message
+    ):
+        config = replace(config, **{field: value})
+
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            with pytest.raises(ValueError, match=message):
+                get_matches("PL", config=config)
+
+        mock_get.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            (
+                "football_api_base_url",
+                None,
+                "URL de l'API football.*chaîne",
+            ),
+            ("api_key", 123, "token de l'API football.*chaîne"),
+        ],
+    )
+    def test_rejects_non_string_http_configuration_before_request(
         self, config, field, value, message
     ):
         config = replace(config, **{field: value})

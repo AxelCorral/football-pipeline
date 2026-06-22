@@ -62,12 +62,21 @@ def get_matches(
         requests.HTTPError: Erreur 4xx non couverte par le fallback.
         RuntimeError: Tous les retries ont échoué (erreurs serveur/réseau).
     """
+    if not isinstance(competition_code, str):
+        raise ValueError("Le code de compétition doit être une chaîne de caractères")
     competition_code = competition_code.strip()
     if not competition_code:
         raise ValueError("Le code de compétition ne peut pas être vide")
 
     if config is None:
         config = Config()
+
+    if not isinstance(config.football_api_base_url, str):
+        raise ValueError("L'URL de l'API football doit être une chaîne de caractères")
+    if not isinstance(config.api_key, str):
+        raise ValueError(
+            "Le token de l'API football doit être une chaîne de caractères"
+        )
 
     base_url = config.football_api_base_url.strip().rstrip("/")
     if not base_url:
