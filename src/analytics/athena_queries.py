@@ -69,6 +69,8 @@ def run_athena_query(
 
     if config is None:
         config = Config()
+    if not config.aws_region.strip():
+        raise ValueError("La région AWS ne peut pas être vide")
 
     client = boto3.client("athena", region_name=config.aws_region)
 
@@ -109,6 +111,8 @@ def results_to_dataframe(
 
     if config is None:
         config = Config()
+    if not config.aws_region.strip():
+        raise ValueError("La région AWS ne peut pas être vide")
 
     client = boto3.client("athena", region_name=config.aws_region)
 

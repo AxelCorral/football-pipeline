@@ -1,5 +1,6 @@
 """Tests de l'API fonctionnelle Athena, sans appel AWS réel."""
 
+from dataclasses import replace
 from unittest.mock import call, patch
 
 import pandas as pd
@@ -72,11 +73,38 @@ def test_run_athena_query_rejects_empty_destination(
 
 
 @patch("src.analytics.athena_queries.boto3.client")
+def test_run_athena_query_rejects_empty_aws_region(mock_client_factory, mock_settings):
+    config = replace(mock_settings, aws_region=" \n ")
+
+    with pytest.raises(ValueError, match="région AWS"):
+        run_athena_query(
+            "SELECT 1",
+            config.athena_database,
+            config.athena_output_s3,
+            config=config,
+        )
+
+    mock_client_factory.assert_not_called()
+
+
+@patch("src.analytics.athena_queries.boto3.client")
 def test_results_to_dataframe_rejects_empty_query_id(
     mock_client_factory, mock_settings
 ):
     with pytest.raises(ValueError, match="identifiant d'exécution Athena"):
         results_to_dataframe(" \n ", config=mock_settings)
+
+    mock_client_factory.assert_not_called()
+
+
+@patch("src.analytics.athena_queries.boto3.client")
+def test_results_to_dataframe_rejects_empty_aws_region(
+    mock_client_factory, mock_settings
+):
+    config = replace(mock_settings, aws_region=" \n ")
+
+    with pytest.raises(ValueError, match="région AWS"):
+        results_to_dataframe("query-123", config=config)
 
     mock_client_factory.assert_not_called()
 
