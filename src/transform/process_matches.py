@@ -84,14 +84,21 @@ def load_raw_from_s3(
                 data = json.loads(body)
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
                 raise ValueError(f"JSON invalide dans s3://{bucket}/{key}") from exc
-            if isinstance(data, list):
-                all_matches.extend(data)
-            else:
+            if not isinstance(data, list):
                 logger.warning(
                     "Format inattendu dans %s (attendu list, reçu %s)",
                     key,
                     type(data).__name__,
                 )
+                continue
+
+            for index, match in enumerate(data):
+                if not isinstance(match, dict):
+                    raise ValueError(
+                        "Match invalide dans "
+                        f"s3://{bucket}/{key} à l'index {index} : objet attendu"
+                    )
+                all_matches.append(match)
 
     if not all_matches:
         logger.warning("Aucun match trouvé sous s3://%s/%s", bucket, prefix)
