@@ -24,7 +24,7 @@ def _raw_df(n: int) -> pd.DataFrame:
 
 
 class TestRunPipeline:
-    @pytest.mark.parametrize("bucket_name", ["", " \n "])
+    @pytest.mark.parametrize("bucket_name", ["", " \n ", None, 42])
     def test_missing_bucket_returns_empty_without_calling_api(self, bucket_name):
         cfg = Config(api_key="k", aws_bucket_name=bucket_name)
         with patch("src.main.fetch_all_competitions") as mock_fetch:
@@ -32,14 +32,24 @@ class TestRunPipeline:
         assert result == {}
         mock_fetch.assert_not_called()
 
-    def test_missing_aws_region_returns_empty_without_calling_api(self):
-        cfg = Config(api_key="k", aws_bucket_name="test-bucket", aws_region=" \n ")
+    @pytest.mark.parametrize("aws_region", ["", " \n ", None, 42])
+    def test_missing_aws_region_returns_empty_without_calling_api(self, aws_region):
+        cfg = Config(
+            api_key="k",
+            aws_bucket_name="test-bucket",
+            aws_region=aws_region,
+        )
 
         with patch("src.main.fetch_all_competitions") as mock_fetch:
             result = run_pipeline(cfg)
 
         assert result == {}
         mock_fetch.assert_not_called()
+
+    @pytest.mark.parametrize("invalid_config", [None, {}, object()])
+    def test_rejects_invalid_config_object(self, invalid_config):
+        with pytest.raises(TypeError, match="instance de Config"):
+            run_pipeline(invalid_config)
 
     @patch("src.main.save_as_parquet")
     @patch("src.main.transform")

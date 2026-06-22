@@ -51,10 +51,15 @@ def run_pipeline(config: Config) -> dict[str, int]:
         Dict ``{competition_code: nombre de matchs curated}`` — 0 si la
         compétition a échoué ou n'a retourné aucun match.
     """
-    if not config.aws_bucket_name.strip():
+    if not isinstance(config, Config):
+        raise TypeError("La configuration du pipeline doit être une instance de Config")
+    if (
+        not isinstance(config.aws_bucket_name, str)
+        or not config.aws_bucket_name.strip()
+    ):
         logger.error("AWS_BUCKET_NAME non défini — pipeline interrompu")
         return {}
-    if not config.aws_region.strip():
+    if not isinstance(config.aws_region, str) or not config.aws_region.strip():
         logger.error("AWS_REGION non définie — pipeline interrompu")
         return {}
 
