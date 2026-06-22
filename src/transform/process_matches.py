@@ -250,19 +250,27 @@ def save_as_parquet(
     Raises:
         ValueError: Si ``df`` est vide.
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les données à sauvegarder doivent être un DataFrame pandas")
     if df.empty:
         raise ValueError("Impossible de sauvegarder un DataFrame vide")
 
+    if not isinstance(bucket, str):
+        raise ValueError("Le nom du bucket S3 doit être une chaîne de caractères")
     bucket = bucket.strip()
     if not bucket:
         raise ValueError("Le nom du bucket S3 ne peut pas être vide")
 
+    if not isinstance(key, str):
+        raise ValueError("La clé S3 doit être une chaîne de caractères")
     key = key.strip().strip("/")
     if not key:
         raise ValueError("La clé S3 ne peut pas être vide")
 
     if config is None:
         config = Config()
+    if not isinstance(config.aws_region, str):
+        raise ValueError("La région AWS doit être une chaîne de caractères")
     aws_region = config.aws_region.strip()
     if not aws_region:
         raise ValueError("La région AWS ne peut pas être vide")

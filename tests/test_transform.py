@@ -609,6 +609,34 @@ class TestTransform:
 class TestSaveAsParquet:
     """Tests de la fonction save_as_parquet."""
 
+    @pytest.mark.parametrize("df", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, config, df):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(TypeError, match="DataFrame pandas"):
+                save_as_parquet(df, "bucket", "key.parquet", config=config)
+
+        mock_client.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("bucket", "key", "message"),
+        [
+            (None, "curated/PL/2023/matches.parquet", "bucket S3"),
+            (42, "curated/PL/2023/matches.parquet", "bucket S3"),
+            ("my-bucket", None, "clé S3"),
+            ("my-bucket", object(), "clé S3"),
+        ],
+    )
+    def test_rejects_non_string_s3_destination(
+        self, config, raw_df, bucket, key, message
+    ):
+        df = transform(raw_df)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match=message):
+                save_as_parquet(df, bucket, key, config=config)
+
+        mock_client.assert_not_called()
+
     @pytest.mark.parametrize(
         ("bucket", "key", "message"),
         [
@@ -643,6 +671,22 @@ class TestSaveAsParquet:
 
     def test_rejects_empty_aws_region_before_s3_call(self, config, raw_df):
         config = replace(config, aws_region=" \n ")
+        df = transform(raw_df)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                save_as_parquet(
+                    df,
+                    "my-bucket",
+                    "curated/PL/2023/matches.parquet",
+                    config=config,
+                )
+
+        mock_client.assert_not_called()
+
+    @pytest.mark.parametrize("aws_region", [None, 42])
+    def test_rejects_non_string_aws_region(self, config, raw_df, aws_region):
+        config = replace(config, aws_region=aws_region)
         df = transform(raw_df)
 
         with patch("src.transform.process_matches.boto3.client") as mock_client:
