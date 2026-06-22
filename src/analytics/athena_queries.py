@@ -83,7 +83,10 @@ def run_athena_query(
         QueryExecutionContext={"Database": database},
         ResultConfiguration={"OutputLocation": output_s3},
     )
-    qeid: str = response["QueryExecutionId"]
+    qeid = response.get("QueryExecutionId")
+    if not isinstance(qeid, str) or not qeid.strip():
+        raise RuntimeError("Réponse Athena invalide : QueryExecutionId absent ou vide")
+    qeid = qeid.strip()
     logger.info("QueryExecutionId : %s", qeid)
 
     _wait_for_completion(client, qeid)

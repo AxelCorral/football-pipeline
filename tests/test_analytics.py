@@ -94,6 +94,28 @@ def test_run_athena_query_rejects_empty_aws_region(mock_client_factory, mock_set
     mock_client_factory.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "response",
+    [{}, {"QueryExecutionId": ""}, {"QueryExecutionId": None}],
+)
+@patch("src.analytics.athena_queries._wait_for_completion")
+@patch("src.analytics.athena_queries.boto3.client")
+def test_run_athena_query_rejects_missing_query_execution_id(
+    mock_client_factory, mock_wait, response, mock_settings
+):
+    mock_client_factory.return_value.start_query_execution.return_value = response
+
+    with pytest.raises(RuntimeError, match="QueryExecutionId absent ou vide"):
+        run_athena_query(
+            "SELECT 1",
+            mock_settings.athena_database,
+            mock_settings.athena_output_s3,
+            config=mock_settings,
+        )
+
+    mock_wait.assert_not_called()
+
+
 @patch("src.analytics.athena_queries.boto3.client")
 def test_results_to_dataframe_rejects_empty_query_id(
     mock_client_factory, mock_settings
