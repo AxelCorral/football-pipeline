@@ -65,6 +65,13 @@ def _mock_response(
 class TestGetMatches:
     """Tests de la fonction get_matches."""
 
+    def test_rejects_empty_competition_before_http_call(self, config):
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            with pytest.raises(ValueError, match="code de compétition"):
+                get_matches(" ", config=config)
+
+        mock_get.assert_not_called()
+
     def test_returns_matches_list(self, config, sample_matches):
         """Doit retourner la liste 'matches' du payload API."""
         with patch("src.ingestion.fetch_matches.requests.get") as mock_get:

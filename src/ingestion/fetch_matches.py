@@ -62,6 +62,10 @@ def get_matches(
         requests.HTTPError: Erreur 4xx non couverte par le fallback.
         RuntimeError: Tous les retries ont échoué (erreurs serveur/réseau).
     """
+    competition_code = competition_code.strip()
+    if not competition_code:
+        raise ValueError("Le code de compétition ne peut pas être vide")
+
     if config is None:
         config = Config()
 
