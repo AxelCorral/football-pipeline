@@ -76,11 +76,20 @@ def train_model(
     best_acc = -1.0
     best_name = ""
     for name, model in candidates.items():
-        model.fit(X_train, y_train)
-        acc = accuracy_score(y_test, model.predict(X_test))
+        try:
+            model.fit(X_train, y_train)
+            predictions = model.predict(X_test)
+        except ValueError as exc:
+            logger.warning("Modèle %s ignoré : %s", name, exc)
+            continue
+
+        acc = accuracy_score(y_test, predictions)
         logger.info("Modèle %s — accuracy test : %.3f", name, acc)
         if acc > best_acc:
             best_acc, best_model, best_name = acc, model, name
+
+    if best_model is None:
+        raise ValueError("Aucun modèle n'a pu être entraîné sur les données fournies")
 
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / f"{best_name}_match_predictor.joblib"

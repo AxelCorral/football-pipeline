@@ -172,6 +172,25 @@ class TestTrainModel:
         model, _, _ = train_model(df_features, models_dir=tmp_path)
         assert hasattr(model, "predict")
 
+    def test_uses_viable_candidate_when_logistic_regression_cannot_train(
+        self, tmp_path
+    ):
+        rows = 10
+        features = pd.DataFrame(
+            {
+                column: [float(index + 1) for index in range(rows)]
+                for column in FEATURE_COLS
+            }
+        )
+        # Le split temporel place une seule classe dans les 8 lignes train.
+        features["result"] = ["H"] * 8 + ["D"] * 2
+
+        model, acc, cm = train_model(features, models_dir=tmp_path)
+
+        assert model.__class__.__name__ == "RandomForestClassifier"
+        assert 0.0 <= acc <= 1.0
+        assert cm.shape == (3, 3)
+
 
 # ---------------------------------------------------------------------------
 # baseline_accuracy
