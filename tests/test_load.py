@@ -56,14 +56,16 @@ class TestS3Loader:
             loader._build_s3_key(prefix, date(2024, 3, 5), filename)
 
     def test_upload_dataframe_calls_s3_put_object(self, mock_settings):
+        settings = replace(mock_settings, aws_region=" eu-west-1 ")
         s3 = MagicMock()
         df = pd.DataFrame({"match_id": [1], "home_team": ["Arsenal"]})
 
-        with patch("src.load.s3_loader.boto3.client", return_value=s3):
-            S3Loader(mock_settings).upload_dataframe(
+        with patch("src.load.s3_loader.boto3.client", return_value=s3) as boto3_client:
+            S3Loader(settings).upload_dataframe(
                 df, "curated", date(2024, 3, 5), "matches.parquet"
             )
 
+        boto3_client.assert_called_once_with("s3", region_name="eu-west-1")
         kwargs = s3.put_object.call_args.kwargs
         assert kwargs["Bucket"] == "test-football-bucket"
         assert kwargs["Key"] == "curated/year=2024/month=03/day=05/matches.parquet"
