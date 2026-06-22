@@ -39,6 +39,13 @@ class TestS3Loader:
 
         assert key == "curated/year=2024/month=03/day=05/matches.parquet"
 
+    def test_build_s3_key_rejects_invalid_partition_date(self, mock_settings):
+        with patch("src.load.s3_loader.boto3.client"):
+            loader = S3Loader(mock_settings)
+
+        with pytest.raises(ValueError, match="date de partition S3"):
+            loader._build_s3_key("curated", "2024-03-05", "matches.parquet")
+
     @pytest.mark.parametrize(
         ("prefix", "filename", "message"),
         [
