@@ -382,10 +382,26 @@ class TestUploadToS3:
 
         mock_client.assert_not_called()
 
+    def test_rejects_non_string_bucket_before_s3_call(self, config):
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="bucket S3.*chaîne"):
+                upload_to_s3([], None, "PL", config=config)
+
+        mock_client.assert_not_called()
+
     def test_rejects_empty_bucket_before_s3_call(self, config):
         with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
             with pytest.raises(ValueError, match="bucket S3"):
                 upload_to_s3([], " ", "PL", config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_non_string_aws_region_before_s3_call(self, config):
+        config = replace(config, aws_region=None)
+
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS.*chaîne"):
+                upload_to_s3([], "bucket", "PL", config=config)
 
         mock_client.assert_not_called()
 
@@ -600,6 +616,10 @@ class TestFetchAllCompetitions:
 
 class TestBuildS3Key:
     """Tests de la fonction build_s3_key."""
+
+    def test_rejects_non_string_competition_code(self):
+        with pytest.raises(ValueError, match="code de compétition.*chaîne"):
+            build_s3_key(None)
 
     def test_rejects_empty_competition_code(self):
         with pytest.raises(ValueError, match="code de compétition"):

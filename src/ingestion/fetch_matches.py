@@ -224,6 +224,8 @@ def build_s3_key(competition_code: str, run_date: date | None = None) -> str:
 
     Format : raw/{competition_code}/{YYYY-MM-DD}/matches.json
     """
+    if not isinstance(competition_code, str):
+        raise ValueError("Le code de compétition doit être une chaîne de caractères")
     competition_code = competition_code.strip()
     if not competition_code:
         raise ValueError("Le code de compétition ne peut pas être vide")
@@ -263,12 +265,16 @@ def upload_to_s3(
     if not isinstance(data, list) or any(not isinstance(match, dict) for match in data):
         raise ValueError("Les données S3 doivent être une liste d'objets match")
 
+    if not isinstance(bucket, str):
+        raise ValueError("Le nom du bucket S3 doit être une chaîne de caractères")
     bucket = bucket.strip()
     if not bucket:
         raise ValueError("Le nom du bucket S3 ne peut pas être vide")
 
     if config is None:
         config = Config()
+    if not isinstance(config.aws_region, str):
+        raise ValueError("La région AWS doit être une chaîne de caractères")
     aws_region = config.aws_region.strip()
     if not aws_region:
         raise ValueError("La région AWS ne peut pas être vide")
