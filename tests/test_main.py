@@ -24,8 +24,9 @@ def _raw_df(n: int) -> pd.DataFrame:
 
 
 class TestRunPipeline:
-    def test_missing_bucket_returns_empty_without_calling_api(self, config):
-        cfg = Config(api_key="k", aws_bucket_name="")
+    @pytest.mark.parametrize("bucket_name", ["", " \n "])
+    def test_missing_bucket_returns_empty_without_calling_api(self, bucket_name):
+        cfg = Config(api_key="k", aws_bucket_name=bucket_name)
         with patch("src.main.fetch_all_competitions") as mock_fetch:
             result = run_pipeline(cfg)
         assert result == {}

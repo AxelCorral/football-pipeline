@@ -51,7 +51,7 @@ def run_pipeline(config: Config) -> dict[str, int]:
         Dict ``{competition_code: nombre de matchs curated}`` — 0 si la
         compétition a échoué ou n'a retourné aucun match.
     """
-    if not config.aws_bucket_name:
+    if not config.aws_bucket_name.strip():
         logger.error("AWS_BUCKET_NAME non défini — pipeline interrompu")
         return {}
 
