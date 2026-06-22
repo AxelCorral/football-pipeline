@@ -32,6 +32,15 @@ class TestRunPipeline:
         assert result == {}
         mock_fetch.assert_not_called()
 
+    def test_missing_aws_region_returns_empty_without_calling_api(self):
+        cfg = Config(api_key="k", aws_bucket_name="test-bucket", aws_region=" \n ")
+
+        with patch("src.main.fetch_all_competitions") as mock_fetch:
+            result = run_pipeline(cfg)
+
+        assert result == {}
+        mock_fetch.assert_not_called()
+
     @patch("src.main.save_as_parquet")
     @patch("src.main.transform")
     @patch("src.main.load_raw_from_s3")

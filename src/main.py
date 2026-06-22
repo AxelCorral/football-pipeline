@@ -54,6 +54,9 @@ def run_pipeline(config: Config) -> dict[str, int]:
     if not config.aws_bucket_name.strip():
         logger.error("AWS_BUCKET_NAME non défini — pipeline interrompu")
         return {}
+    if not config.aws_region.strip():
+        logger.error("AWS_REGION non définie — pipeline interrompu")
+        return {}
 
     raw_results = fetch_all_competitions(COMPETITIONS, season=None, config=config)
 
