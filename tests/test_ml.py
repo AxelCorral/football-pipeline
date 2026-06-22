@@ -3,6 +3,7 @@
 import pandas as pd
 import pytest
 
+import src.ml.train as train_module
 from src.ml.evaluate import baseline_accuracy
 from src.ml.features import FEATURE_COLS, REQUIRED_COLUMNS, compute_features
 from src.ml.train import LABEL_MAP, train_model
@@ -197,6 +198,25 @@ class TestTrainModel:
         assert model.__class__.__name__ == "RandomForestClassifier"
         assert 0.0 <= acc <= 1.0
         assert cm.shape == (3, 3)
+
+    def test_raises_when_all_candidate_models_fail(
+        self, df_features, tmp_path, monkeypatch
+    ):
+        class FailingModel:
+            def fit(self, X, y):
+                raise ValueError("training failed")
+
+        monkeypatch.setattr(
+            train_module, "LogisticRegression", lambda **kwargs: FailingModel()
+        )
+        monkeypatch.setattr(
+            train_module, "RandomForestClassifier", lambda **kwargs: FailingModel()
+        )
+
+        with pytest.raises(ValueError, match="Aucun modèle"):
+            train_model(df_features, models_dir=tmp_path)
+
+        assert list(tmp_path.glob("*.joblib")) == []
 
 
 # ---------------------------------------------------------------------------
