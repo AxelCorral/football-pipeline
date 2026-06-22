@@ -13,18 +13,21 @@ class TestAthenaQueryRunner:
     """Vérifie la soumission, le polling et la pagination sans appel AWS."""
 
     @pytest.mark.parametrize(
-        ("field", "message"),
+        ("field", "value", "message"),
         [
-            ("athena_database", "base Athena"),
-            ("athena_output_s3", "emplacement S3"),
-            ("aws_region", "région AWS"),
+            ("athena_database", " \n ", "base Athena"),
+            ("athena_database", None, "base Athena"),
+            ("athena_output_s3", " \n ", "emplacement S3"),
+            ("athena_output_s3", None, "emplacement S3"),
+            ("aws_region", " \n ", "région AWS"),
+            ("aws_region", None, "région AWS"),
         ],
     )
     @patch("src.query.athena_query.boto3.client")
     def test_init_rejects_empty_athena_settings(
-        self, mock_client_factory, field, message, mock_settings
+        self, mock_client_factory, field, value, message, mock_settings
     ):
-        settings = replace(mock_settings, **{field: " \n "})
+        settings = replace(mock_settings, **{field: value})
 
         with pytest.raises(ValueError, match=message):
             AthenaQueryRunner(settings)
@@ -86,11 +89,12 @@ class TestAthenaQueryRunner:
         runner._fetch_results.assert_called_once_with("query-123")
 
     @patch("src.query.athena_query.boto3.client")
-    def test_run_query_rejects_empty_sql(self, mock_client_factory, mock_settings):
+    @pytest.mark.parametrize("sql", [" \n ", None])
+    def test_run_query_rejects_empty_sql(self, mock_client_factory, sql, mock_settings):
         client = mock_client_factory.return_value
 
         with pytest.raises(ValueError, match="requête SQL"):
-            AthenaQueryRunner(mock_settings).run_query(" \n ")
+            AthenaQueryRunner(mock_settings).run_query(sql)
 
         client.start_query_execution.assert_not_called()
 

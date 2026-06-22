@@ -15,19 +15,24 @@ MAX_WAIT_SECONDS = 300
 _FAILED_STATES = frozenset({"FAILED", "CANCELLED"})
 
 
+def _require_non_empty_string(value: object, label: str) -> str:
+    """Normalise une chaîne obligatoire ou lève une erreur explicite."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} ne peut pas être vide")
+    return value.strip()
+
+
 class AthenaQueryRunner:
     """Lance des requêtes SQL sur Athena et retourne les résultats."""
 
     def __init__(self, settings: Config) -> None:
-        athena_database = settings.athena_database.strip()
-        if not athena_database:
-            raise ValueError("Le nom de la base Athena ne peut pas être vide")
-        athena_output_s3 = settings.athena_output_s3.strip()
-        if not athena_output_s3:
-            raise ValueError("L'emplacement S3 des résultats ne peut pas être vide")
-        aws_region = settings.aws_region.strip()
-        if not aws_region:
-            raise ValueError("La région AWS ne peut pas être vide")
+        athena_database = _require_non_empty_string(
+            settings.athena_database, "Le nom de la base Athena"
+        )
+        athena_output_s3 = _require_non_empty_string(
+            settings.athena_output_s3, "L'emplacement S3 des résultats"
+        )
+        aws_region = _require_non_empty_string(settings.aws_region, "La région AWS")
 
         self.settings = settings
         self.athena_database = athena_database
@@ -36,8 +41,7 @@ class AthenaQueryRunner:
 
     def run_query(self, sql: str) -> pd.DataFrame:
         """Soumet une requête, attend sa réussite et retourne ses résultats."""
-        if not sql.strip():
-            raise ValueError("La requête SQL ne peut pas être vide")
+        sql = _require_non_empty_string(sql, "La requête SQL")
 
         response = self.client.start_query_execution(
             QueryString=sql,
