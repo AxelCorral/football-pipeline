@@ -14,6 +14,9 @@ def baseline_accuracy(df: pd.DataFrame) -> float:
     Returns:
         Fraction de matchs FINISHED remportés à domicile. 0.0 si aucun match.
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les données à évaluer doivent être un DataFrame pandas")
+
     required_columns = {"status", "result"}
     missing_columns = required_columns.difference(df.columns)
     if missing_columns:

@@ -233,6 +233,11 @@ class TestTrainModel:
 
 
 class TestBaselineAccuracy:
+    @pytest.mark.parametrize("invalid_input", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, invalid_input):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            baseline_accuracy(invalid_input)
+
     def test_returns_float(self, df_matches):
         assert isinstance(baseline_accuracy(df_matches), float)
 
