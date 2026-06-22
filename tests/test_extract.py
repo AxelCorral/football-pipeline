@@ -142,6 +142,7 @@ class TestFootballApiClient:
         [
             ([], "objet JSON attendu"),
             ({"matches": {}}, "'matches' doit être une liste"),
+            ({"matches": [{"id": 1}, "invalid"]}, "liste d'objets"),
         ],
     )
     def test_get_matches_rejects_invalid_payload(self, mock_settings, payload, message):

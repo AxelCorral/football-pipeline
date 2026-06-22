@@ -58,8 +58,12 @@ class FootballApiClient:
             raise ValueError("Réponse API invalide : objet JSON attendu")
 
         matches = payload.get("matches", [])
-        if not isinstance(matches, list):
-            raise ValueError("Réponse API invalide : 'matches' doit être une liste")
+        if not isinstance(matches, list) or not all(
+            isinstance(match, dict) for match in matches
+        ):
+            raise ValueError(
+                "Réponse API invalide : 'matches' doit être une liste d'objets"
+            )
         return matches
 
     def get_competition(self, competition_id: int) -> dict[str, Any]:
