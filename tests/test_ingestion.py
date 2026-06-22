@@ -6,6 +6,7 @@ Aucun appel réel : requests et boto3 sont entièrement mockés.
 """
 
 import json
+from dataclasses import replace
 from datetime import date
 from unittest.mock import MagicMock, call, patch
 
@@ -312,6 +313,15 @@ class TestUploadToS3:
 
         mock_client.assert_not_called()
 
+    def test_rejects_empty_aws_region_before_s3_call(self, config):
+        config = replace(config, aws_region=" \n ")
+
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                upload_to_s3([], "my-bucket", "PL", config=config)
+
+        mock_client.assert_not_called()
+
     def test_calls_put_object(self, config, sample_matches):
         """put_object doit être appelé avec le bucket et la clé construite."""
         mock_s3 = MagicMock()
@@ -372,6 +382,7 @@ class TestUploadToS3:
 
     def test_uses_aws_region_from_config(self, config):
         """boto3.client doit utiliser la région de la config."""
+        config = replace(config, aws_region=" eu-west-1 ")
         mock_s3 = MagicMock()
         with patch(
             "src.ingestion.fetch_matches.boto3.client", return_value=mock_s3

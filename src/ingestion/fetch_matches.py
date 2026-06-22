@@ -234,11 +234,14 @@ def upload_to_s3(
 
     if config is None:
         config = Config()
+    aws_region = config.aws_region.strip()
+    if not aws_region:
+        raise ValueError("La région AWS ne peut pas être vide")
 
     key = build_s3_key(competition_code, run_date)
     payload = json.dumps(data, ensure_ascii=False, default=str).encode("utf-8")
 
-    s3_client = boto3.client("s3", region_name=config.aws_region)
+    s3_client = boto3.client("s3", region_name=aws_region)
 
     logger.info(
         "Upload S3 s3://%s/%s (%d octets, %d matchs)",
