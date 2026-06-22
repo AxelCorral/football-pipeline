@@ -49,6 +49,22 @@ class TestS3Loader:
     @pytest.mark.parametrize(
         ("prefix", "filename", "message"),
         [
+            (None, "matches.parquet", "préfixe S3.*chaîne"),
+            ("curated", 123, "nom de fichier S3.*chaîne"),
+        ],
+    )
+    def test_build_s3_key_rejects_non_string_components(
+        self, mock_settings, prefix, filename, message
+    ):
+        with patch("src.load.s3_loader.boto3.client"):
+            loader = S3Loader(mock_settings)
+
+        with pytest.raises(ValueError, match=message):
+            loader._build_s3_key(prefix, date(2024, 3, 5), filename)
+
+    @pytest.mark.parametrize(
+        ("prefix", "filename", "message"),
+        [
             (" / ", "matches.parquet", "préfixe S3"),
             ("curated", " / ", "nom de fichier S3"),
         ],

@@ -62,6 +62,10 @@ class S3Loader:
         """Construit la clé S3 partitionnée par date Hive-style."""
         if not isinstance(partition_date, date):
             raise ValueError("La date de partition S3 doit être une date")
+        if not isinstance(prefix, str):
+            raise ValueError("Le préfixe S3 doit être une chaîne de caractères")
+        if not isinstance(filename, str):
+            raise ValueError("Le nom de fichier S3 doit être une chaîne de caractères")
         clean_prefix = prefix.strip().strip("/")
         clean_filename = filename.strip().strip("/")
         if not clean_prefix:
