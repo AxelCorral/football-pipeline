@@ -94,6 +94,26 @@ class TestAthenaQueryRunner:
 
         client.start_query_execution.assert_not_called()
 
+    @pytest.mark.parametrize(
+        "response",
+        [{}, {"QueryExecutionId": ""}, {"QueryExecutionId": None}],
+    )
+    @patch("src.query.athena_query.boto3.client")
+    def test_run_query_rejects_missing_query_execution_id(
+        self, mock_client_factory, response, mock_settings
+    ):
+        client = mock_client_factory.return_value
+        client.start_query_execution.return_value = response
+        runner = AthenaQueryRunner(mock_settings)
+        runner._wait_for_query = MagicMock()
+        runner._fetch_results = MagicMock()
+
+        with pytest.raises(RuntimeError, match="QueryExecutionId absent ou vide"):
+            runner.run_query("SELECT 1")
+
+        runner._wait_for_query.assert_not_called()
+        runner._fetch_results.assert_not_called()
+
     @patch("src.query.athena_query.boto3.client")
     def test_wait_for_query_raises_on_failed_status(
         self, mock_client_factory, mock_settings

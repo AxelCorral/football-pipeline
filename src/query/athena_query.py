@@ -44,7 +44,12 @@ class AthenaQueryRunner:
             QueryExecutionContext={"Database": self.athena_database},
             ResultConfiguration={"OutputLocation": self.athena_output_s3},
         )
-        query_execution_id = response["QueryExecutionId"]
+        query_execution_id = response.get("QueryExecutionId")
+        if not isinstance(query_execution_id, str) or not query_execution_id.strip():
+            raise RuntimeError(
+                "Réponse Athena invalide : QueryExecutionId absent ou vide"
+            )
+        query_execution_id = query_execution_id.strip()
         self._wait_for_query(query_execution_id)
         return self._fetch_results(query_execution_id)
 
