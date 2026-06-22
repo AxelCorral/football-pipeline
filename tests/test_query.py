@@ -33,6 +33,7 @@ class TestAthenaQueryRunner:
 
     @patch("src.query.athena_query.boto3.client")
     def test_run_query_returns_dataframe(self, mock_client_factory, mock_settings):
+        settings = replace(mock_settings, aws_region=" eu-west-1 ")
         client = mock_client_factory.return_value
         client.start_query_execution.return_value = {"QueryExecutionId": "query-123"}
         client.get_query_execution.return_value = {
@@ -52,8 +53,9 @@ class TestAthenaQueryRunner:
             }
         }
 
-        result = AthenaQueryRunner(mock_settings).run_query("SELECT * FROM matches")
+        result = AthenaQueryRunner(settings).run_query("SELECT * FROM matches")
 
+        mock_client_factory.assert_called_once_with("athena", region_name="eu-west-1")
         pd.testing.assert_frame_equal(
             result, pd.DataFrame([["Arsenal", "42"]], columns=["team", "goals"])
         )
