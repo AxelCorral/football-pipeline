@@ -28,6 +28,13 @@ MAX_WAIT_SECONDS = 300
 _TERMINAL_STATES = frozenset({"SUCCEEDED", "FAILED", "CANCELLED"})
 
 
+def _require_non_empty_string(value: object, label: str) -> str:
+    """Normalise une chaîne obligatoire ou lève une erreur explicite."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} ne peut pas être vide")
+    return value.strip()
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -60,20 +67,13 @@ def run_athena_query(
         RuntimeError: La requête s'est terminée en état FAILED ou CANCELLED.
         TimeoutError: ``MAX_WAIT_SECONDS`` dépassés sans résultat.
     """
-    if not query.strip():
-        raise ValueError("La requête SQL ne peut pas être vide")
-    database = database.strip()
-    if not database:
-        raise ValueError("Le nom de la base Athena ne peut pas être vide")
-    output_s3 = output_s3.strip()
-    if not output_s3:
-        raise ValueError("L'emplacement S3 des résultats ne peut pas être vide")
+    query = _require_non_empty_string(query, "La requête SQL")
+    database = _require_non_empty_string(database, "Le nom de la base Athena")
+    output_s3 = _require_non_empty_string(output_s3, "L'emplacement S3 des résultats")
 
     if config is None:
         config = Config()
-    aws_region = config.aws_region.strip()
-    if not aws_region:
-        raise ValueError("La région AWS ne peut pas être vide")
+    aws_region = _require_non_empty_string(config.aws_region, "La région AWS")
 
     client = boto3.client("athena", region_name=aws_region)
 
@@ -112,15 +112,13 @@ def results_to_dataframe(
         DataFrame dont toutes les colonnes sont de type ``object`` (str / None).
         Appeler ``pd.to_numeric``, ``pd.to_datetime``, etc. pour convertir.
     """
-    query_execution_id = query_execution_id.strip()
-    if not query_execution_id:
-        raise ValueError("L'identifiant d'exécution Athena ne peut pas être vide")
+    query_execution_id = _require_non_empty_string(
+        query_execution_id, "L'identifiant d'exécution Athena"
+    )
 
     if config is None:
         config = Config()
-    aws_region = config.aws_region.strip()
-    if not aws_region:
-        raise ValueError("La région AWS ne peut pas être vide")
+    aws_region = _require_non_empty_string(config.aws_region, "La région AWS")
 
     client = boto3.client("athena", region_name=aws_region)
 

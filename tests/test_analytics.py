@@ -45,10 +45,11 @@ def test_run_athena_query_submits_configured_request(
 
 
 @patch("src.analytics.athena_queries.boto3.client")
-def test_run_athena_query_rejects_empty_sql(mock_client_factory, mock_settings):
+@pytest.mark.parametrize("query", [" \n ", None])
+def test_run_athena_query_rejects_empty_sql(mock_client_factory, query, mock_settings):
     with pytest.raises(ValueError, match="requête SQL"):
         run_athena_query(
-            " \n ",
+            query,
             mock_settings.athena_database,
             mock_settings.athena_output_s3,
             config=mock_settings,
@@ -61,7 +62,9 @@ def test_run_athena_query_rejects_empty_sql(mock_client_factory, mock_settings):
     ("database", "output_s3", "message"),
     [
         (" \n ", "s3://bucket/results/", "base Athena"),
+        (None, "s3://bucket/results/", "base Athena"),
         ("analytics", " \n ", "emplacement S3"),
+        ("analytics", None, "emplacement S3"),
     ],
 )
 @patch("src.analytics.athena_queries.boto3.client")
@@ -80,8 +83,11 @@ def test_run_athena_query_rejects_empty_destination(
 
 
 @patch("src.analytics.athena_queries.boto3.client")
-def test_run_athena_query_rejects_empty_aws_region(mock_client_factory, mock_settings):
-    config = replace(mock_settings, aws_region=" \n ")
+@pytest.mark.parametrize("aws_region", [" \n ", None])
+def test_run_athena_query_rejects_empty_aws_region(
+    mock_client_factory, aws_region, mock_settings
+):
+    config = replace(mock_settings, aws_region=aws_region)
 
     with pytest.raises(ValueError, match="région AWS"):
         run_athena_query(
@@ -117,20 +123,22 @@ def test_run_athena_query_rejects_missing_query_execution_id(
 
 
 @patch("src.analytics.athena_queries.boto3.client")
+@pytest.mark.parametrize("query_execution_id", [" \n ", None])
 def test_results_to_dataframe_rejects_empty_query_id(
-    mock_client_factory, mock_settings
+    mock_client_factory, query_execution_id, mock_settings
 ):
     with pytest.raises(ValueError, match="identifiant d'exécution Athena"):
-        results_to_dataframe(" \n ", config=mock_settings)
+        results_to_dataframe(query_execution_id, config=mock_settings)
 
     mock_client_factory.assert_not_called()
 
 
 @patch("src.analytics.athena_queries.boto3.client")
+@pytest.mark.parametrize("aws_region", [" \n ", None])
 def test_results_to_dataframe_rejects_empty_aws_region(
-    mock_client_factory, mock_settings
+    mock_client_factory, aws_region, mock_settings
 ):
-    config = replace(mock_settings, aws_region=" \n ")
+    config = replace(mock_settings, aws_region=aws_region)
 
     with pytest.raises(ValueError, match="région AWS"):
         results_to_dataframe("query-123", config=config)
