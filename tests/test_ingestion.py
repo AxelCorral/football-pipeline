@@ -286,6 +286,13 @@ class TestGetMatches:
 class TestUploadToS3:
     """Tests de la fonction upload_to_s3."""
 
+    def test_rejects_empty_bucket_before_s3_call(self, config):
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="bucket S3"):
+                upload_to_s3([], " ", "PL", config=config)
+
+        mock_client.assert_not_called()
+
     def test_calls_put_object(self, config, sample_matches):
         """put_object doit être appelé avec le bucket et la clé construite."""
         mock_s3 = MagicMock()
@@ -442,6 +449,10 @@ class TestFetchAllCompetitions:
 
 class TestBuildS3Key:
     """Tests de la fonction build_s3_key."""
+
+    def test_rejects_empty_competition_code(self):
+        with pytest.raises(ValueError, match="code de compétition"):
+            build_s3_key(" ", date(2024, 3, 15))
 
     def test_format_with_explicit_date(self):
         """La clé doit suivre le format raw/{code}/{date}/matches.json."""

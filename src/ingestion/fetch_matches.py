@@ -192,6 +192,10 @@ def build_s3_key(competition_code: str, run_date: date | None = None) -> str:
 
     Format : raw/{competition_code}/{YYYY-MM-DD}/matches.json
     """
+    competition_code = competition_code.strip()
+    if not competition_code:
+        raise ValueError("Le code de compétition ne peut pas être vide")
+
     if run_date is None:
         run_date = date.today()
     return f"raw/{competition_code}/{run_date.isoformat()}/matches.json"
@@ -220,6 +224,10 @@ def upload_to_s3(
     Returns:
         URI S3 complète : ``s3://{bucket}/{key}``.
     """
+    bucket = bucket.strip()
+    if not bucket:
+        raise ValueError("Le nom du bucket S3 ne peut pas être vide")
+
     if config is None:
         config = Config()
 
