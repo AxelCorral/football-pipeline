@@ -598,6 +598,21 @@ class TestSaveAsParquet:
         assert kw["Bucket"] == "my-bucket"
         assert kw["Key"] == "curated/PL/2023/matches.parquet"
 
+    def test_rejects_empty_aws_region_before_s3_call(self, config, raw_df):
+        config = replace(config, aws_region=" \n ")
+        df = transform(raw_df)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                save_as_parquet(
+                    df,
+                    "my-bucket",
+                    "curated/PL/2023/matches.parquet",
+                    config=config,
+                )
+
+        mock_client.assert_not_called()
+
     def test_save_uses_default_config_when_none_is_provided(self, config, raw_df):
         df = transform(raw_df)
         mock_s3 = MagicMock()
@@ -654,6 +669,7 @@ class TestSaveAsParquet:
             save_as_parquet(pd.DataFrame(), "bucket", "key.parquet", config=config)
 
     def test_uses_region_from_config(self, config, raw_df):
+        config = replace(config, aws_region=" eu-west-1 ")
         df = transform(raw_df)
         mock_s3 = MagicMock()
 

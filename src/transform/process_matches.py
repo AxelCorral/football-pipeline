@@ -239,13 +239,16 @@ def save_as_parquet(
 
     if config is None:
         config = Config()
+    aws_region = config.aws_region.strip()
+    if not aws_region:
+        raise ValueError("La région AWS ne peut pas être vide")
 
     buf = io.BytesIO()
     df.to_parquet(buf, index=False, engine="pyarrow")
     buf.seek(0)
     payload = buf.read()
 
-    s3 = boto3.client("s3", region_name=config.aws_region)
+    s3 = boto3.client("s3", region_name=aws_region)
     logger.info(
         "Upload Parquet s3://%s/%s (%d octets, %d lignes)",
         bucket,
