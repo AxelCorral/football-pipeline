@@ -18,21 +18,23 @@ from src.analytics.athena_queries import (
 def test_run_athena_query_submits_configured_request(
     mock_client_factory, mock_wait, mock_settings
 ):
+    config = replace(mock_settings, aws_region=" eu-west-1 ")
     client = mock_client_factory.return_value
     client.start_query_execution.return_value = {"QueryExecutionId": "query-123"}
 
     result = run_athena_query(
         "SELECT 1",
-        mock_settings.athena_database,
-        mock_settings.athena_output_s3,
-        config=mock_settings,
+        config.athena_database,
+        config.athena_output_s3,
+        config=config,
     )
 
     assert result == "query-123"
+    mock_client_factory.assert_called_once_with("athena", region_name="eu-west-1")
     client.start_query_execution.assert_called_once_with(
         QueryString="SELECT 1",
-        QueryExecutionContext={"Database": mock_settings.athena_database},
-        ResultConfiguration={"OutputLocation": mock_settings.athena_output_s3},
+        QueryExecutionContext={"Database": config.athena_database},
+        ResultConfiguration={"OutputLocation": config.athena_output_s3},
     )
     mock_wait.assert_called_once_with(client, "query-123")
 
@@ -113,6 +115,7 @@ def test_results_to_dataframe_rejects_empty_aws_region(
 def test_results_to_dataframe_handles_pagination_and_nulls(
     mock_client_factory, mock_settings
 ):
+    config = replace(mock_settings, aws_region=" eu-west-1 ")
     client = mock_client_factory.return_value
     client.get_query_results.side_effect = [
         {
@@ -135,8 +138,9 @@ def test_results_to_dataframe_handles_pagination_and_nulls(
         {"ResultSet": {"Rows": [{"Data": [{"VarCharValue": "Liverpool"}, {}]}]}},
     ]
 
-    result = results_to_dataframe("query-123", config=mock_settings)
+    result = results_to_dataframe("query-123", config=config)
 
+    mock_client_factory.assert_called_once_with("athena", region_name="eu-west-1")
     pd.testing.assert_frame_equal(
         result,
         pd.DataFrame(
