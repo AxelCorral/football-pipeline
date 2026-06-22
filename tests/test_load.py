@@ -20,6 +20,22 @@ class TestS3Loader:
 
         assert key == "curated/year=2024/month=03/day=05/matches.parquet"
 
+    @pytest.mark.parametrize(
+        ("prefix", "filename", "message"),
+        [
+            (" / ", "matches.parquet", "préfixe S3"),
+            ("curated", " / ", "nom de fichier S3"),
+        ],
+    )
+    def test_build_s3_key_rejects_empty_components(
+        self, mock_settings, prefix, filename, message
+    ):
+        with patch("src.load.s3_loader.boto3.client"):
+            loader = S3Loader(mock_settings)
+
+        with pytest.raises(ValueError, match=message):
+            loader._build_s3_key(prefix, date(2024, 3, 5), filename)
+
     def test_upload_dataframe_calls_s3_put_object(self, mock_settings):
         s3 = MagicMock()
         df = pd.DataFrame({"match_id": [1], "home_team": ["Arsenal"]})

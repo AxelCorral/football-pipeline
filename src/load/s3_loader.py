@@ -53,8 +53,13 @@ class S3Loader:
 
     def _build_s3_key(self, prefix: str, partition_date: date, filename: str) -> str:
         """Construit la clé S3 partitionnée par date Hive-style."""
-        clean_prefix = prefix.strip("/")
-        clean_filename = filename.lstrip("/")
+        clean_prefix = prefix.strip().strip("/")
+        clean_filename = filename.strip().strip("/")
+        if not clean_prefix:
+            raise ValueError("Le préfixe S3 ne peut pas être vide")
+        if not clean_filename:
+            raise ValueError("Le nom de fichier S3 ne peut pas être vide")
+
         return (
             f"{clean_prefix}/year={partition_date.year}"
             f"/month={partition_date.month:02d}"
