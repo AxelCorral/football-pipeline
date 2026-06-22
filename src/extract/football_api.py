@@ -33,6 +33,9 @@ class FootballApiClient:
         date_to: date,
     ) -> list[dict[str, Any]]:
         """Retourne les matchs d'une compétition pour une plage de dates."""
+        if date_from > date_to:
+            raise ValueError("date_from doit être antérieure ou égale à date_to")
+
         response = requests.get(
             f"{self.base_url}/competitions/{competition_id}/matches",
             headers=self.headers,

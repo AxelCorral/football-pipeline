@@ -60,6 +60,16 @@ class TestFootballApiClient:
             "dateTo": "2024-03-04",
         }
 
+    def test_get_matches_rejects_inverted_date_range(self, mock_settings):
+        """Une plage inversée doit échouer avant tout appel HTTP."""
+        with patch("src.extract.football_api.requests.get") as mock_get:
+            with pytest.raises(ValueError, match="date_from.*date_to"):
+                FootballApiClient(mock_settings).get_matches(
+                    2021, date(2024, 2, 1), date(2024, 1, 31)
+                )
+
+        mock_get.assert_not_called()
+
     def test_get_matches_raises_on_http_error(self, mock_settings):
         """Une réponse 4xx/5xx doit lever une HTTPError."""
         response = MagicMock()
