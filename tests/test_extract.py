@@ -98,6 +98,18 @@ class TestFootballApiClient:
 
         mock_get.assert_not_called()
 
+    @pytest.mark.parametrize("competition_id", [0, -1, True, "2021"])
+    def test_get_matches_rejects_invalid_competition_id(
+        self, mock_settings, competition_id
+    ):
+        with patch("src.extract.football_api.requests.get") as mock_get:
+            with pytest.raises(ValueError, match="entier strictement positif"):
+                FootballApiClient(mock_settings).get_matches(
+                    competition_id, date(2024, 1, 1), date(2024, 1, 31)
+                )
+
+        mock_get.assert_not_called()
+
     def test_get_matches_raises_on_http_error(self, mock_settings):
         """Une réponse 4xx/5xx doit lever une HTTPError."""
         response = MagicMock()
@@ -136,6 +148,13 @@ class TestFootballApiClient:
             competition = FootballApiClient(mock_settings).get_competition(2021)
 
         assert competition == {"id": 2021, "name": "Premier League"}
+
+    def test_get_competition_rejects_invalid_competition_id(self, mock_settings):
+        with patch("src.extract.football_api.requests.get") as mock_get:
+            with pytest.raises(ValueError, match="entier strictement positif"):
+                FootballApiClient(mock_settings).get_competition(0)
+
+        mock_get.assert_not_called()
 
     def test_get_competition_rejects_non_object_payload(self, mock_settings):
         """Les métadonnées de compétition doivent être un objet JSON."""

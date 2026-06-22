@@ -40,6 +40,7 @@ class FootballApiClient:
         date_to: date,
     ) -> list[dict[str, Any]]:
         """Retourne les matchs d'une compétition pour une plage de dates."""
+        _validate_competition_id(competition_id)
         if date_from > date_to:
             raise ValueError("date_from doit être antérieure ou égale à date_to")
 
@@ -61,6 +62,7 @@ class FootballApiClient:
 
     def get_competition(self, competition_id: int) -> dict[str, Any]:
         """Retourne les métadonnées d'une compétition."""
+        _validate_competition_id(competition_id)
         response = requests.get(
             f"{self.base_url}/competitions/{competition_id}",
             headers=self.headers,
@@ -71,3 +73,13 @@ class FootballApiClient:
         if not isinstance(payload, dict):
             raise ValueError("Réponse API invalide : objet JSON attendu")
         return payload
+
+
+def _validate_competition_id(competition_id: int) -> None:
+    """Rejette les identifiants qui ne peuvent pas désigner une compétition."""
+    if (
+        isinstance(competition_id, bool)
+        or not isinstance(competition_id, int)
+        or competition_id <= 0
+    ):
+        raise ValueError("competition_id doit être un entier strictement positif")
