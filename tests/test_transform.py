@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 
 from src.config import Config
+from src.transform.glue_transform import GlueTransformer
 from src.transform.process_matches import (
     build_curated_key,
     load_raw_from_s3,
@@ -99,22 +100,53 @@ def _body(matches: list[dict]) -> MagicMock:
 
 
 class TestGlueTransformer:
-    """Tests du transformateur de données matchs (stubs)."""
+    """Tests du transformateur de données matchs Glue-like."""
 
     def test_transform_returns_dataframe(self, sample_raw_matches):
-        pass
+        result = GlueTransformer().transform(sample_raw_matches)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
 
     def test_transform_flattens_nested_fields(self, sample_raw_matches):
-        pass
+        result = GlueTransformer().transform(sample_raw_matches)
+
+        assert result.loc[0, "home_team"] == "Manchester City FC"
+        assert result.loc[0, "away_team"] == "Arsenal FC"
+        assert result.loc[0, "home_goals"] == 3
+        assert result.loc[0, "away_goals"] == 1
 
     def test_transform_adds_partition_columns(self, sample_raw_matches):
-        pass
+        result = GlueTransformer().transform(sample_raw_matches)
+
+        assert result.loc[0, ["year", "month", "day"]].tolist() == [2024, 3, 15]
 
     def test_transform_empty_input_returns_empty_dataframe(self):
-        pass
+        result = GlueTransformer().transform([])
+
+        assert result.empty
+        assert {"match_id", "date", "year", "month", "day"} <= set(result.columns)
 
     def test_flatten_match_extracts_team_names(self, sample_raw_matches):
-        pass
+        result = GlueTransformer()._flatten_match(sample_raw_matches[0])
+
+        assert result["home_team"] == "Manchester City FC"
+        assert result["away_team"] == "Arsenal FC"
+
+    def test_transform_deduplicates_match_ids(self, sample_raw_matches):
+        duplicate = dict(sample_raw_matches[0])
+
+        result = GlueTransformer().transform([sample_raw_matches[0], duplicate])
+
+        assert len(result) == 1
+
+    def test_transform_filters_matches_without_id(self, sample_raw_matches):
+        invalid = dict(sample_raw_matches[0])
+        invalid.pop("id")
+
+        result = GlueTransformer().transform([invalid])
+
+        assert result.empty
 
 
 # ---------------------------------------------------------------------------
