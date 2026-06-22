@@ -56,9 +56,13 @@ def run_athena_query(
         ``QueryExecutionId`` Athena (str).
 
     Raises:
+        ValueError: La requête SQL est vide.
         RuntimeError: La requête s'est terminée en état FAILED ou CANCELLED.
         TimeoutError: ``MAX_WAIT_SECONDS`` dépassés sans résultat.
     """
+    if not query.strip():
+        raise ValueError("La requête SQL ne peut pas être vide")
+
     if config is None:
         config = Config()
 

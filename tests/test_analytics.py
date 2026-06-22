@@ -37,6 +37,19 @@ def test_run_athena_query_submits_configured_request(
 
 
 @patch("src.analytics.athena_queries.boto3.client")
+def test_run_athena_query_rejects_empty_sql(mock_client_factory, mock_settings):
+    with pytest.raises(ValueError, match="requête SQL"):
+        run_athena_query(
+            " \n ",
+            mock_settings.athena_database,
+            mock_settings.athena_output_s3,
+            config=mock_settings,
+        )
+
+    mock_client_factory.assert_not_called()
+
+
+@patch("src.analytics.athena_queries.boto3.client")
 def test_results_to_dataframe_handles_pagination_and_nulls(
     mock_client_factory, mock_settings
 ):
