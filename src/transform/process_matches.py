@@ -64,6 +64,10 @@ def load_raw_from_s3(
     Returns:
         DataFrame aplati (``pd.json_normalize``) ; vide si aucun fichier.
     """
+    bucket = bucket.strip()
+    if not bucket:
+        raise ValueError("Le nom du bucket S3 ne peut pas être vide")
+
     if config is None:
         config = Config()
 
