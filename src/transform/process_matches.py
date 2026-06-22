@@ -74,9 +74,12 @@ def load_raw_from_s3(
 
     if config is None:
         config = Config()
+    aws_region = config.aws_region.strip()
+    if not aws_region:
+        raise ValueError("La région AWS ne peut pas être vide")
 
     prefix = f"raw/{competition_code}/"
-    s3 = boto3.client("s3", region_name=config.aws_region)
+    s3 = boto3.client("s3", region_name=aws_region)
     all_matches: list[dict[str, Any]] = []
 
     paginator = s3.get_paginator("list_objects_v2")

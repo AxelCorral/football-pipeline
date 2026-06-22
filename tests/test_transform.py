@@ -7,6 +7,7 @@ Aucun appel réel : boto3 est entièrement mocké.
 
 import io
 import json
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -172,6 +173,15 @@ class TestLoadRawFromS3:
 
         mock_client.assert_not_called()
 
+    def test_rejects_empty_aws_region_before_s3_call(self, config):
+        config = replace(config, aws_region=" \n ")
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                load_raw_from_s3("my-bucket", "PL", config=config)
+
+        mock_client.assert_not_called()
+
     def test_returns_dataframe_with_rows(self, config, raw_match):
         mock_s3 = _mock_s3_with_content(
             [{"Contents": [{"Key": "raw/PL/2024-03-15/matches.json"}]}]
@@ -256,6 +266,7 @@ class TestLoadRawFromS3:
         assert len(df) == 2
 
     def test_uses_region_from_config(self, config, raw_match):
+        config = replace(config, aws_region=" eu-west-1 ")
         mock_s3 = _mock_s3_with_content(
             [{"Contents": [{"Key": "raw/PL/2024-03-15/matches.json"}]}]
         )
