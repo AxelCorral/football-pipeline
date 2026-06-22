@@ -33,7 +33,7 @@ FEATURE_COLS = [
 
 def train_model(
     df_features: pd.DataFrame,
-    models_dir: Path = MODELS_DIR,
+    models_dir: str | Path = MODELS_DIR,
 ) -> tuple[Any, float, np.ndarray]:
     """Entraîne LR et RF, retourne le meilleur modèle, accuracy et matrice de confusion.
 
@@ -49,6 +49,9 @@ def train_model(
     """
     if not isinstance(df_features, pd.DataFrame):
         raise TypeError("Les features doivent être fournies dans un DataFrame pandas")
+    if not isinstance(models_dir, (str, Path)):
+        raise TypeError("Le répertoire des modèles doit être un chemin")
+    models_path = Path(models_dir)
 
     required_columns = set(FEATURE_COLS) | {"result"}
     missing_columns = required_columns.difference(df_features.columns)
@@ -100,8 +103,8 @@ def train_model(
     if best_model is None:
         raise ValueError("Aucun modèle n'a pu être entraîné sur les données fournies")
 
-    models_dir.mkdir(parents=True, exist_ok=True)
-    model_path = models_dir / f"{best_name}_match_predictor.joblib"
+    models_path.mkdir(parents=True, exist_ok=True)
+    model_path = models_path / f"{best_name}_match_predictor.joblib"
     joblib.dump(best_model, model_path)
     logger.info("Meilleur modèle : %s (%.3f) → %s", best_name, best_acc, model_path)
 

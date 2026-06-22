@@ -175,6 +175,16 @@ class TestTrainModel:
         train_model(df_features, models_dir=tmp_path)
         assert len(list(tmp_path.glob("*.joblib"))) == 1
 
+    def test_accepts_string_models_directory(self, df_features, tmp_path):
+        train_model(df_features, models_dir=str(tmp_path))
+
+        assert len(list(tmp_path.glob("*.joblib"))) == 1
+
+    @pytest.mark.parametrize("invalid_models_dir", [None, 42, []])
+    def test_rejects_invalid_models_directory(self, df_features, invalid_models_dir):
+        with pytest.raises(TypeError, match="répertoire des modèles"):
+            train_model(df_features, models_dir=invalid_models_dir)
+
     def test_confusion_matrix_labels(self, df_features, tmp_path):
         """La matrice de confusion doit couvrir H=0, D=1, A=2."""
         _, _, cm = train_model(df_features, models_dir=tmp_path)
