@@ -23,6 +23,10 @@ class FootballApiClient:
     BASE_URL = "https://api.football-data.org/v4"
 
     def __init__(self, settings: Config) -> None:
+        if not isinstance(settings, Config):
+            raise TypeError(
+                "La configuration du client API doit être une instance de Config"
+            )
         if not isinstance(settings.football_api_base_url, str):
             raise ValueError(
                 "L'URL de l'API football doit être une chaîne de caractères"

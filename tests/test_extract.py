@@ -18,6 +18,11 @@ from src.extract.football_api import FootballApiClient
 class TestFootballApiClient:
     """Tests du client API football-data.org."""
 
+    @pytest.mark.parametrize("settings", [None, {}, object()])
+    def test_init_rejects_invalid_settings_object(self, settings):
+        with pytest.raises(TypeError, match="instance de Config"):
+            FootballApiClient(settings)
+
     @pytest.mark.parametrize(
         ("field", "value", "message"),
         [
