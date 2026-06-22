@@ -49,6 +49,38 @@ def test_run_athena_query_rejects_empty_sql(mock_client_factory, mock_settings):
     mock_client_factory.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("database", "output_s3", "message"),
+    [
+        (" \n ", "s3://bucket/results/", "base Athena"),
+        ("analytics", " \n ", "emplacement S3"),
+    ],
+)
+@patch("src.analytics.athena_queries.boto3.client")
+def test_run_athena_query_rejects_empty_destination(
+    mock_client_factory, database, output_s3, message, mock_settings
+):
+    with pytest.raises(ValueError, match=message):
+        run_athena_query(
+            "SELECT 1",
+            database,
+            output_s3,
+            config=mock_settings,
+        )
+
+    mock_client_factory.assert_not_called()
+
+
+@patch("src.analytics.athena_queries.boto3.client")
+def test_results_to_dataframe_rejects_empty_query_id(
+    mock_client_factory, mock_settings
+):
+    with pytest.raises(ValueError, match="identifiant d'exécution Athena"):
+        results_to_dataframe(" \n ", config=mock_settings)
+
+    mock_client_factory.assert_not_called()
+
+
 @patch("src.analytics.athena_queries.boto3.client")
 def test_results_to_dataframe_handles_pagination_and_nulls(
     mock_client_factory, mock_settings
