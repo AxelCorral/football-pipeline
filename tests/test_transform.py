@@ -184,6 +184,18 @@ class TestLoadRawFromS3:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 1
 
+    def test_uses_default_config_when_none_is_provided(self, config):
+        mock_s3 = _mock_s3_with_content([{}])
+        with (
+            patch(
+                "src.transform.process_matches.Config", return_value=config
+            ) as mock_config,
+            patch("src.transform.process_matches.boto3.client", return_value=mock_s3),
+        ):
+            load_raw_from_s3("my-bucket", "PL")
+
+        mock_config.assert_called_once_with()
+
     def test_concatenates_multiple_files(self, config, raw_match):
         mock_s3 = _mock_s3_with_content(
             [
@@ -574,6 +586,19 @@ class TestSaveAsParquet:
         kw = mock_s3.put_object.call_args[1]
         assert kw["Bucket"] == "my-bucket"
         assert kw["Key"] == "curated/PL/2023/matches.parquet"
+
+    def test_save_uses_default_config_when_none_is_provided(self, config, raw_df):
+        df = transform(raw_df)
+        mock_s3 = MagicMock()
+        with (
+            patch(
+                "src.transform.process_matches.Config", return_value=config
+            ) as mock_config,
+            patch("src.transform.process_matches.boto3.client", return_value=mock_s3),
+        ):
+            save_as_parquet(df, "my-bucket", "curated/PL/2023/matches.parquet")
+
+        mock_config.assert_called_once_with()
 
     def test_returns_s3_uri(self, config, raw_df):
         df = transform(raw_df)

@@ -80,6 +80,18 @@ class TestGetMatches:
 
         assert result == sample_matches
 
+    def test_uses_default_config_when_none_is_provided(self, config):
+        with (
+            patch(
+                "src.ingestion.fetch_matches.Config", return_value=config
+            ) as mock_config,
+            patch("src.ingestion.fetch_matches.requests.get") as mock_get,
+        ):
+            mock_get.return_value = _mock_response(200, {"matches": []})
+            get_matches("PL")
+
+        mock_config.assert_called_once_with()
+
     def test_sends_auth_header(self, config):
         """Le token API doit être transmis dans X-Auth-Token."""
         with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
@@ -312,6 +324,18 @@ class TestUploadToS3:
         call_kwargs = mock_s3.put_object.call_args[1]
         assert call_kwargs["Bucket"] == "my-bucket"
         assert call_kwargs["Key"] == "raw/PL/2024-03-15/matches.json"
+
+    def test_upload_uses_default_config_when_none_is_provided(self, config):
+        mock_s3 = MagicMock()
+        with (
+            patch(
+                "src.ingestion.fetch_matches.Config", return_value=config
+            ) as mock_config,
+            patch("src.ingestion.fetch_matches.boto3.client", return_value=mock_s3),
+        ):
+            upload_to_s3([], "my-bucket", "PL")
+
+        mock_config.assert_called_once_with()
 
     def test_returns_s3_uri(self, config, sample_matches):
         """Doit retourner une URI s3:// avec la clé construite."""
