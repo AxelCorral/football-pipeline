@@ -13,6 +13,24 @@ from src.load.s3_loader import S3Loader
 class TestS3Loader:
     """Tests du chargeur S3."""
 
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("aws_bucket_name", None, "bucket S3.*chaîne"),
+            ("aws_region", 123, "région AWS.*chaîne"),
+        ],
+    )
+    def test_init_rejects_non_string_configuration(
+        self, mock_settings, field, value, message
+    ):
+        settings = replace(mock_settings, **{field: value})
+
+        with patch("src.load.s3_loader.boto3.client") as boto3_client:
+            with pytest.raises(ValueError, match=message):
+                S3Loader(settings)
+
+        boto3_client.assert_not_called()
+
     def test_init_rejects_empty_bucket_name(self, mock_settings):
         settings = replace(mock_settings, aws_bucket_name=" ")
 
