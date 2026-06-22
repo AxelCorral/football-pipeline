@@ -13,6 +13,14 @@ from src.load.s3_loader import S3Loader
 class TestS3Loader:
     """Tests du chargeur S3."""
 
+    @pytest.mark.parametrize("settings", [None, {}, object()])
+    def test_init_rejects_invalid_settings_object(self, settings):
+        with patch("src.load.s3_loader.boto3.client") as boto3_client:
+            with pytest.raises(TypeError, match="instance de Config"):
+                S3Loader(settings)
+
+        boto3_client.assert_not_called()
+
     @pytest.mark.parametrize(
         ("field", "value", "message"),
         [

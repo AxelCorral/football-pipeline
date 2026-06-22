@@ -22,6 +22,10 @@ class S3Loader:
     """Upload des DataFrames pandas vers S3 en format Parquet."""
 
     def __init__(self, settings: Config) -> None:
+        if not isinstance(settings, Config):
+            raise TypeError(
+                "La configuration du chargeur S3 doit être une instance de Config"
+            )
         if not isinstance(settings.aws_bucket_name, str):
             raise ValueError("Le nom du bucket S3 doit être une chaîne de caractères")
         if not isinstance(settings.aws_region, str):
