@@ -16,6 +16,7 @@ from src.config import Config
 from src.transform.glue_transform import GlueTransformer
 from src.transform.process_matches import (
     build_curated_key,
+    filter_by_season,
     load_raw_from_s3,
     save_as_parquet,
     transform,
@@ -560,3 +561,31 @@ class TestBuildCuratedKey:
 
     def test_ends_with_parquet(self):
         assert build_curated_key("SA", 2021).endswith(".parquet")
+
+
+class TestFilterBySeason:
+    """Tests du filtrage empêchant de mélanger les saisons."""
+
+    def test_filters_integer_and_string_seasons(self):
+        df = pd.DataFrame(
+            {
+                "match_id": [1, 2, 3],
+                "season": [2024, "2025", 2025],
+            }
+        )
+
+        result = filter_by_season(df, 2025)
+
+        assert result["match_id"].tolist() == [2, 3]
+
+    def test_returns_independent_copy(self):
+        df = pd.DataFrame({"match_id": [1], "season": [2025]})
+
+        result = filter_by_season(df, 2025)
+        result["league_code"] = "PL"
+
+        assert "league_code" not in df.columns
+
+    def test_raises_when_season_column_is_missing(self):
+        with pytest.raises(ValueError, match="Colonne 'season' absente"):
+            filter_by_season(pd.DataFrame({"match_id": [1]}), 2025)

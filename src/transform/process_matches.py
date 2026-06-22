@@ -163,6 +163,15 @@ def build_curated_key(competition_code: str, season: int | str) -> str:
     return f"curated/{competition_code}/{season}/matches.parquet"
 
 
+def filter_by_season(df: pd.DataFrame, season: int | str) -> pd.DataFrame:
+    """Retourne uniquement les matchs de la saison demandée."""
+    if "season" not in df.columns:
+        raise ValueError("Colonne 'season' absente du DataFrame transformé")
+
+    normalized_season = pd.to_numeric(df["season"], errors="coerce")
+    return df.loc[normalized_season.eq(int(season))].copy()
+
+
 def save_as_parquet(
     df: pd.DataFrame,
     bucket: str,
