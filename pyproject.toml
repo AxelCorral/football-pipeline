@@ -33,7 +33,6 @@ python_functions = ["test_*"]
 source = ["src"]
 omit = [
     "src/analytics/athena_queries.py",
-    "src/extract/football_api.py",
     "src/load/s3_loader.py",
     "src/main.py",
     "src/query/athena_query.py",
