@@ -155,3 +155,21 @@ class TestAthenaQueryRunner:
                 NextToken="page-2",
             ),
         ]
+
+    @patch("src.query.athena_query.boto3.client")
+    def test_fetch_results_preserves_columns_for_empty_result(
+        self, mock_client_factory, mock_settings
+    ):
+        mock_client_factory.return_value.get_query_results.return_value = {
+            "ResultSet": {
+                "ResultSetMetadata": {
+                    "ColumnInfo": [{"Name": "team"}, {"Name": "goals"}]
+                },
+                "Rows": [],
+            }
+        }
+
+        result = AthenaQueryRunner(mock_settings)._fetch_results("query-empty")
+
+        assert result.empty
+        assert list(result.columns) == ["team", "goals"]

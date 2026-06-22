@@ -77,13 +77,22 @@ class AthenaQueryRunner:
                 request["NextToken"] = next_token
 
             response = self.client.get_query_results(**request)
-            result_rows = response.get("ResultSet", {}).get("Rows", [])
+            result_set = response.get("ResultSet", {})
+            result_rows = result_set.get("Rows", [])
 
-            if columns is None and result_rows:
-                columns = [
-                    cell.get("VarCharValue", "")
-                    for cell in result_rows.pop(0).get("Data", [])
-                ]
+            if columns is None:
+                column_info = result_set.get("ResultSetMetadata", {}).get(
+                    "ColumnInfo", []
+                )
+                columns = [column["Name"] for column in column_info]
+
+                if result_rows:
+                    if not columns:
+                        columns = [
+                            cell.get("VarCharValue", "")
+                            for cell in result_rows[0].get("Data", [])
+                        ]
+                    result_rows = result_rows[1:]
 
             for row in result_rows:
                 values = [cell.get("VarCharValue") for cell in row.get("Data", [])]
