@@ -47,6 +47,9 @@ def train_model(
     Raises:
         ValueError: Moins de 10 lignes valides après suppression des NaN.
     """
+    if not isinstance(df_features, pd.DataFrame):
+        raise TypeError("Les features doivent être fournies dans un DataFrame pandas")
+
     clean = df_features.dropna(subset=FEATURE_COLS + ["result"]).copy()
     if len(clean) < 10:
         raise ValueError(

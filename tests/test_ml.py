@@ -151,6 +151,11 @@ class TestComputeFeatures:
 
 
 class TestTrainModel:
+    @pytest.mark.parametrize("invalid_input", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, invalid_input, tmp_path):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            train_model(invalid_input, models_dir=tmp_path)
+
     def test_returns_model_accuracy_cm(self, df_features, tmp_path):
         model, acc, cm = train_model(df_features, models_dir=tmp_path)
         assert model is not None
