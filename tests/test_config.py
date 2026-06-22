@@ -1,6 +1,11 @@
 """Tests du chargement de configuration."""
 
 from src.config import Config
+from src.config.settings import Settings
+
+
+def test_settings_alias_preserves_backward_compatibility():
+    assert Settings is Config
 
 
 def test_load_reads_environment(monkeypatch):
