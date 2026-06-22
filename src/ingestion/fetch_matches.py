@@ -239,6 +239,9 @@ def upload_to_s3(
     Returns:
         URI S3 complète : ``s3://{bucket}/{key}``.
     """
+    if not isinstance(data, list) or any(not isinstance(match, dict) for match in data):
+        raise ValueError("Les données S3 doivent être une liste d'objets match")
+
     bucket = bucket.strip()
     if not bucket:
         raise ValueError("Le nom du bucket S3 ne peut pas être vide")

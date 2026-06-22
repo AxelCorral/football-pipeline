@@ -339,6 +339,20 @@ class TestGetMatches:
 class TestUploadToS3:
     """Tests de la fonction upload_to_s3."""
 
+    @pytest.mark.parametrize("data", [{"id": 1}, [{"id": 1}, "invalid"]])
+    def test_rejects_invalid_match_data_before_s3_call(self, config, data):
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="liste d'objets match"):
+                upload_to_s3(
+                    data,
+                    "test-bucket",
+                    "PL",
+                    date(2024, 3, 15),
+                    config=config,
+                )
+
+        mock_client.assert_not_called()
+
     def test_rejects_empty_bucket_before_s3_call(self, config):
         with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
             with pytest.raises(ValueError, match="bucket S3"):
