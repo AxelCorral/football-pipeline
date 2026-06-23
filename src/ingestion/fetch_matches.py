@@ -62,11 +62,31 @@ def get_matches(
         requests.HTTPError: Erreur 4xx non couverte par le fallback.
         RuntimeError: Tous les retries ont échoué (erreurs serveur/réseau).
     """
+    if not isinstance(competition_code, str):
+        raise ValueError("Le code de compétition doit être une chaîne de caractères")
+    competition_code = competition_code.strip()
+    if not competition_code:
+        raise ValueError("Le code de compétition ne peut pas être vide")
+
     if config is None:
         config = Config()
 
-    url = f"{config.football_api_base_url}/competitions/{competition_code}/matches"
-    headers = {"X-Auth-Token": config.api_key}
+    if not isinstance(config.football_api_base_url, str):
+        raise ValueError("L'URL de l'API football doit être une chaîne de caractères")
+    if not isinstance(config.api_key, str):
+        raise ValueError(
+            "Le token de l'API football doit être une chaîne de caractères"
+        )
+
+    base_url = config.football_api_base_url.strip().rstrip("/")
+    if not base_url:
+        raise ValueError("L'URL de l'API football ne peut pas être vide")
+    api_key = config.api_key.strip()
+    if not api_key:
+        raise ValueError("Le token de l'API football ne peut pas être vide")
+
+    url = f"{base_url}/competitions/{competition_code}/matches"
+    headers = {"X-Auth-Token": api_key}
     params: dict[str, Any] = {"season": season} if season is not None else {}
 
     try:
@@ -112,7 +132,17 @@ def _request_with_retry(
             response = requests.get(url, headers=headers, params=params, timeout=30)
             response.raise_for_status()
 
-            matches: list[dict[str, Any]] = response.json().get("matches", [])
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Réponse API invalide : objet JSON attendu")
+
+            matches = payload.get("matches", [])
+            if not isinstance(matches, list) or not all(
+                isinstance(match, dict) for match in matches
+            ):
+                raise ValueError(
+                    "Réponse API invalide : 'matches' doit être une liste d'objets"
+                )
             logger.info("%d matchs récupérés depuis %s", len(matches), url)
             return matches
 
@@ -157,9 +187,21 @@ def fetch_all_competitions(
     Returns:
         Dict ``{code: [matchs]}`` — liste vide si la compétition a échoué.
     """
+    if not isinstance(competitions, list):
+        raise ValueError("Les compétitions doivent être fournies dans une liste")
+
+    normalized_competitions: list[str] = []
+    for index, code in enumerate(competitions):
+        if not isinstance(code, str) or not code.strip():
+            raise ValueError(
+                f"Code de compétition invalide à l'index {index} : "
+                "chaîne non vide attendue"
+            )
+        normalized_competitions.append(code.strip())
+
     results: dict[str, list[dict[str, Any]]] = {}
-    total = len(competitions)
-    for i, code in enumerate(competitions, 1):
+    total = len(normalized_competitions)
+    for i, code in enumerate(normalized_competitions, 1):
         name = COMPETITION_NAMES.get(code, code)
         logger.info("Ingestion %s — %s… (%d/%d)", code, name, i, total)
         try:
@@ -182,8 +224,18 @@ def build_s3_key(competition_code: str, run_date: date | None = None) -> str:
 
     Format : raw/{competition_code}/{YYYY-MM-DD}/matches.json
     """
+    if not isinstance(competition_code, str):
+        raise ValueError("Le code de compétition doit être une chaîne de caractères")
+    competition_code = competition_code.strip()
+    if not competition_code:
+        raise ValueError("Le code de compétition ne peut pas être vide")
+    if "/" in competition_code or "\\" in competition_code:
+        raise ValueError("Le code de compétition ne peut pas contenir de séparateur")
+
     if run_date is None:
         run_date = date.today()
+    elif not isinstance(run_date, date):
+        raise ValueError("La date de collecte S3 doit être une date")
     return f"raw/{competition_code}/{run_date.isoformat()}/matches.json"
 
 
@@ -210,13 +262,27 @@ def upload_to_s3(
     Returns:
         URI S3 complète : ``s3://{bucket}/{key}``.
     """
+    if not isinstance(data, list) or any(not isinstance(match, dict) for match in data):
+        raise ValueError("Les données S3 doivent être une liste d'objets match")
+
+    if not isinstance(bucket, str):
+        raise ValueError("Le nom du bucket S3 doit être une chaîne de caractères")
+    bucket = bucket.strip()
+    if not bucket:
+        raise ValueError("Le nom du bucket S3 ne peut pas être vide")
+
     if config is None:
         config = Config()
+    if not isinstance(config.aws_region, str):
+        raise ValueError("La région AWS doit être une chaîne de caractères")
+    aws_region = config.aws_region.strip()
+    if not aws_region:
+        raise ValueError("La région AWS ne peut pas être vide")
 
     key = build_s3_key(competition_code, run_date)
     payload = json.dumps(data, ensure_ascii=False, default=str).encode("utf-8")
 
-    s3_client = boto3.client("s3", region_name=config.aws_region)
+    s3_client = boto3.client("s3", region_name=aws_region)
 
     logger.info(
         "Upload S3 s3://%s/%s (%d octets, %d matchs)",

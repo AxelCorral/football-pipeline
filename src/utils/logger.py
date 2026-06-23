@@ -20,6 +20,8 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     si la fonction est appelée plusieurs fois avec le même nom.
     """
     logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.propagate = False
     if logger.handlers:
         return logger
 
@@ -31,6 +33,4 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         )
     )
     logger.addHandler(handler)
-    logger.setLevel(level)
-    logger.propagate = False
     return logger

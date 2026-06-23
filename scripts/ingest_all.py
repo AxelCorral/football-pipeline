@@ -23,6 +23,7 @@ from src.ingestion.fetch_matches import (  # noqa: E402
 )
 from src.transform.process_matches import (  # noqa: E402
     build_curated_key,
+    filter_by_season,
     load_raw_from_s3,
     save_as_parquet,
     transform,
@@ -55,7 +56,11 @@ def ingest_season(season: int, cfg: Config) -> dict[str, int]:
             print(f"  ✗ {code}: données S3 vides")
             summary[code] = 0
             continue
-        df = transform(df_raw)
+        df = filter_by_season(transform(df_raw), season)
+        if df.empty:
+            print(f"  ✗ {code}: aucun match pour la saison {season}")
+            summary[code] = 0
+            continue
         key = build_curated_key(code, season)
         uri = save_as_parquet(df, cfg.aws_bucket_name, key, config=cfg)
         n_fin = int((df["status"] == "FINISHED").sum())

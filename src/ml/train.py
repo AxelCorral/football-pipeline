@@ -33,7 +33,7 @@ FEATURE_COLS = [
 
 def train_model(
     df_features: pd.DataFrame,
-    models_dir: Path = MODELS_DIR,
+    models_dir: str | Path = MODELS_DIR,
 ) -> tuple[Any, float, np.ndarray]:
     """Entraîne LR et RF, retourne le meilleur modèle, accuracy et matrice de confusion.
 
@@ -47,10 +47,29 @@ def train_model(
     Raises:
         ValueError: Moins de 10 lignes valides après suppression des NaN.
     """
+    if not isinstance(df_features, pd.DataFrame):
+        raise TypeError("Les features doivent être fournies dans un DataFrame pandas")
+    if not isinstance(models_dir, (str, Path)):
+        raise TypeError("Le répertoire des modèles doit être un chemin")
+    models_path = Path(models_dir)
+
+    required_columns = set(FEATURE_COLS) | {"result"}
+    missing_columns = required_columns.difference(df_features.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"Colonnes requises absentes : {missing}")
+
     clean = df_features.dropna(subset=FEATURE_COLS + ["result"]).copy()
     if len(clean) < 10:
         raise ValueError(
             f"Données insuffisantes : {len(clean)} lignes valides (minimum 10)"
+        )
+
+    unknown_labels = sorted(set(clean["result"]) - set(LABEL_MAP))
+    if unknown_labels:
+        raise ValueError(
+            "Labels de résultat non supportés : "
+            f"{unknown_labels}. Valeurs attendues : {sorted(LABEL_MAP)}"
         )
 
     X = clean[FEATURE_COLS].values.astype(float)
@@ -69,14 +88,23 @@ def train_model(
     best_acc = -1.0
     best_name = ""
     for name, model in candidates.items():
-        model.fit(X_train, y_train)
-        acc = accuracy_score(y_test, model.predict(X_test))
+        try:
+            model.fit(X_train, y_train)
+            predictions = model.predict(X_test)
+        except ValueError as exc:
+            logger.warning("Modèle %s ignoré : %s", name, exc)
+            continue
+
+        acc = accuracy_score(y_test, predictions)
         logger.info("Modèle %s — accuracy test : %.3f", name, acc)
         if acc > best_acc:
             best_acc, best_model, best_name = acc, model, name
 
-    models_dir.mkdir(parents=True, exist_ok=True)
-    model_path = models_dir / f"{best_name}_match_predictor.joblib"
+    if best_model is None:
+        raise ValueError("Aucun modèle n'a pu être entraîné sur les données fournies")
+
+    models_path.mkdir(parents=True, exist_ok=True)
+    model_path = models_path / f"{best_name}_match_predictor.joblib"
     joblib.dump(best_model, model_path)
     logger.info("Meilleur modèle : %s (%.3f) → %s", best_name, best_acc, model_path)
 

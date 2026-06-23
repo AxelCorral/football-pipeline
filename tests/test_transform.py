@@ -7,14 +7,17 @@ Aucun appel réel : boto3 est entièrement mocké.
 
 import io
 import json
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
 from src.config import Config
+from src.transform.glue_transform import GlueTransformer
 from src.transform.process_matches import (
     build_curated_key,
+    filter_by_season,
     load_raw_from_s3,
     save_as_parquet,
     transform,
@@ -99,22 +102,63 @@ def _body(matches: list[dict]) -> MagicMock:
 
 
 class TestGlueTransformer:
-    """Tests du transformateur de données matchs (stubs)."""
+    """Tests du transformateur de données matchs Glue-like."""
 
     def test_transform_returns_dataframe(self, sample_raw_matches):
-        pass
+        result = GlueTransformer().transform(sample_raw_matches)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
 
     def test_transform_flattens_nested_fields(self, sample_raw_matches):
-        pass
+        result = GlueTransformer().transform(sample_raw_matches)
+
+        assert result.loc[0, "home_team"] == "Manchester City FC"
+        assert result.loc[0, "away_team"] == "Arsenal FC"
+        assert result.loc[0, "home_goals"] == 3
+        assert result.loc[0, "away_goals"] == 1
 
     def test_transform_adds_partition_columns(self, sample_raw_matches):
-        pass
+        result = GlueTransformer().transform(sample_raw_matches)
+
+        assert result.loc[0, ["year", "month", "day"]].tolist() == [2024, 3, 15]
 
     def test_transform_empty_input_returns_empty_dataframe(self):
-        pass
+        result = GlueTransformer().transform([])
+
+        assert result.empty
+        assert {"match_id", "date", "year", "month", "day"} <= set(result.columns)
+
+    @pytest.mark.parametrize("raw_matches", [None, {"id": 1}, "invalid"])
+    def test_transform_rejects_non_list_input(self, raw_matches):
+        with pytest.raises(ValueError, match="dans une liste"):
+            GlueTransformer().transform(raw_matches)
+
+    @pytest.mark.parametrize("invalid_match", [None, "invalid", 42])
+    def test_transform_rejects_non_object_match(self, invalid_match):
+        with pytest.raises(ValueError, match="index 1"):
+            GlueTransformer().transform([{"id": 1}, invalid_match])
 
     def test_flatten_match_extracts_team_names(self, sample_raw_matches):
-        pass
+        result = GlueTransformer()._flatten_match(sample_raw_matches[0])
+
+        assert result["home_team"] == "Manchester City FC"
+        assert result["away_team"] == "Arsenal FC"
+
+    def test_transform_deduplicates_match_ids(self, sample_raw_matches):
+        duplicate = dict(sample_raw_matches[0])
+
+        result = GlueTransformer().transform([sample_raw_matches[0], duplicate])
+
+        assert len(result) == 1
+
+    def test_transform_filters_matches_without_id(self, sample_raw_matches):
+        invalid = dict(sample_raw_matches[0])
+        invalid.pop("id")
+
+        result = GlueTransformer().transform([invalid])
+
+        assert result.empty
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +168,62 @@ class TestGlueTransformer:
 
 class TestLoadRawFromS3:
     """Tests de la fonction load_raw_from_s3."""
+
+    def test_rejects_non_string_bucket_before_s3_call(self, config):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="bucket S3.*chaîne"):
+                load_raw_from_s3(None, "PL", config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_empty_bucket_before_s3_call(self, config):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="bucket S3"):
+                load_raw_from_s3(" ", "PL", config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_non_string_competition_before_s3_call(self, config):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="code de compétition.*chaîne"):
+                load_raw_from_s3("my-bucket", None, config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_empty_competition_before_s3_call(self, config):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="code de compétition"):
+                load_raw_from_s3("my-bucket", " ", config=config)
+
+        mock_client.assert_not_called()
+
+    @pytest.mark.parametrize("competition_code", ["PL/2024", r"PL\2024"])
+    def test_rejects_competition_path_separators_before_s3_call(
+        self, competition_code, config
+    ):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="séparateur"):
+                load_raw_from_s3("my-bucket", competition_code, config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_non_string_aws_region_before_s3_call(self, config):
+        config = replace(config, aws_region=None)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS.*chaîne"):
+                load_raw_from_s3("my-bucket", "PL", config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_empty_aws_region_before_s3_call(self, config):
+        config = replace(config, aws_region=" \n ")
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                load_raw_from_s3("my-bucket", "PL", config=config)
+
+        mock_client.assert_not_called()
 
     def test_returns_dataframe_with_rows(self, config, raw_match):
         mock_s3 = _mock_s3_with_content(
@@ -136,6 +236,18 @@ class TestLoadRawFromS3:
 
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 1
+
+    def test_uses_default_config_when_none_is_provided(self, config):
+        mock_s3 = _mock_s3_with_content([{}])
+        with (
+            patch(
+                "src.transform.process_matches.Config", return_value=config
+            ) as mock_config,
+            patch("src.transform.process_matches.boto3.client", return_value=mock_s3),
+        ):
+            load_raw_from_s3("my-bucket", "PL")
+
+        mock_config.assert_called_once_with()
 
     def test_concatenates_multiple_files(self, config, raw_match):
         mock_s3 = _mock_s3_with_content(
@@ -197,6 +309,7 @@ class TestLoadRawFromS3:
         assert len(df) == 2
 
     def test_uses_region_from_config(self, config, raw_match):
+        config = replace(config, aws_region=" eu-west-1 ")
         mock_s3 = _mock_s3_with_content(
             [{"Contents": [{"Key": "raw/PL/2024-03-15/matches.json"}]}]
         )
@@ -209,6 +322,54 @@ class TestLoadRawFromS3:
 
         mock_client.assert_called_once_with("s3", region_name="eu-west-1")
 
+    def test_invalid_json_error_identifies_s3_object(self, config):
+        key = "raw/PL/2024-03-15/matches.json"
+        mock_s3 = _mock_s3_with_content([{"Contents": [{"Key": key}]}])
+        body = MagicMock()
+        body.read.return_value = b"{invalid"
+        mock_s3.get_object.return_value = {"Body": body}
+
+        with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
+            with pytest.raises(
+                ValueError,
+                match=r"JSON invalide dans s3://my-bucket/raw/PL/2024-03-15/matches\.json",
+            ):
+                load_raw_from_s3("my-bucket", "PL", config=config)
+
+    def test_rejects_non_list_json_with_s3_location(self, config):
+        key = "raw/PL/2024-03-15/matches.json"
+        mock_s3 = _mock_s3_with_content([{"Contents": [{"Key": key}]}])
+        body = MagicMock()
+        body.read.return_value = json.dumps({"matches": []}).encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": body}
+
+        with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
+            with pytest.raises(
+                ValueError,
+                match=(
+                    r"Format JSON invalide dans s3://my-bucket/"
+                    r"raw/PL/2024-03-15/matches\.json : liste attendue, dict reçu"
+                ),
+            ):
+                load_raw_from_s3("my-bucket", "PL", config=config)
+
+    def test_rejects_non_object_match_with_s3_location(self, config):
+        key = "raw/PL/2024-03-15/matches.json"
+        mock_s3 = _mock_s3_with_content([{"Contents": [{"Key": key}]}])
+        body = MagicMock()
+        body.read.return_value = json.dumps([{"id": 1}, "invalid"]).encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": body}
+
+        with patch("src.transform.process_matches.boto3.client", return_value=mock_s3):
+            with pytest.raises(
+                ValueError,
+                match=(
+                    r"Match invalide dans s3://my-bucket/"
+                    r"raw/PL/2024-03-15/matches\.json à l'index 1"
+                ),
+            ):
+                load_raw_from_s3("my-bucket", "PL", config=config)
+
 
 # ---------------------------------------------------------------------------
 # transform
@@ -217,6 +378,11 @@ class TestLoadRawFromS3:
 
 class TestTransform:
     """Tests de la fonction transform."""
+
+    @pytest.mark.parametrize("df", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, df):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            transform(df)
 
     def test_returns_dataframe(self, raw_df):
         assert isinstance(transform(raw_df), pd.DataFrame)
@@ -397,6 +563,29 @@ class TestTransform:
         out = transform(df)
         assert len(out) == 2
 
+    def test_duplicate_match_ids_keep_latest_snapshot(self, raw_match):
+        scheduled = dict(raw_match)
+        scheduled["status"] = "SCHEDULED"
+        scheduled["score"] = {"fullTime": {"home": None, "away": None}}
+
+        out = transform(pd.json_normalize([scheduled, raw_match]))
+
+        assert len(out) == 1
+        assert out.iloc[0]["match_id"] == raw_match["id"]
+        assert out.iloc[0]["status"] == "FINISHED"
+        assert out.iloc[0]["result"] == "H"
+
+    def test_rows_without_match_id_are_not_deduplicated(self):
+        first = _scheduled_match()
+        second = _scheduled_match()
+        first.pop("id")
+        second.pop("id")
+        second["homeTeam"] = {"name": "Team C"}
+
+        out = transform(pd.json_normalize([first, second]))
+
+        assert len(out) == 2
+
     def test_competition_code_none_when_field_absent(self):
         """competition.code absent de la réponse → colonne None, pas d'erreur."""
         df = pd.json_normalize(
@@ -425,6 +614,52 @@ class TestTransform:
 class TestSaveAsParquet:
     """Tests de la fonction save_as_parquet."""
 
+    @pytest.mark.parametrize("df", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, config, df):
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(TypeError, match="DataFrame pandas"):
+                save_as_parquet(df, "bucket", "key.parquet", config=config)
+
+        mock_client.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("bucket", "key", "message"),
+        [
+            (None, "curated/PL/2023/matches.parquet", "bucket S3"),
+            (42, "curated/PL/2023/matches.parquet", "bucket S3"),
+            ("my-bucket", None, "clé S3"),
+            ("my-bucket", object(), "clé S3"),
+        ],
+    )
+    def test_rejects_non_string_s3_destination(
+        self, config, raw_df, bucket, key, message
+    ):
+        df = transform(raw_df)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match=message):
+                save_as_parquet(df, bucket, key, config=config)
+
+        mock_client.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("bucket", "key", "message"),
+        [
+            (" ", "curated/PL/2023/matches.parquet", "bucket S3"),
+            ("my-bucket", " / ", "clé S3"),
+        ],
+    )
+    def test_rejects_empty_s3_destination_before_client_creation(
+        self, config, raw_df, bucket, key, message
+    ):
+        df = transform(raw_df)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match=message):
+                save_as_parquet(df, bucket, key, config=config)
+
+        mock_client.assert_not_called()
+
     def test_calls_put_object_with_correct_bucket_and_key(self, config, raw_df):
         df = transform(raw_df)
         mock_s3 = MagicMock()
@@ -438,6 +673,50 @@ class TestSaveAsParquet:
         kw = mock_s3.put_object.call_args[1]
         assert kw["Bucket"] == "my-bucket"
         assert kw["Key"] == "curated/PL/2023/matches.parquet"
+
+    def test_rejects_empty_aws_region_before_s3_call(self, config, raw_df):
+        config = replace(config, aws_region=" \n ")
+        df = transform(raw_df)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                save_as_parquet(
+                    df,
+                    "my-bucket",
+                    "curated/PL/2023/matches.parquet",
+                    config=config,
+                )
+
+        mock_client.assert_not_called()
+
+    @pytest.mark.parametrize("aws_region", [None, 42])
+    def test_rejects_non_string_aws_region(self, config, raw_df, aws_region):
+        config = replace(config, aws_region=aws_region)
+        df = transform(raw_df)
+
+        with patch("src.transform.process_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                save_as_parquet(
+                    df,
+                    "my-bucket",
+                    "curated/PL/2023/matches.parquet",
+                    config=config,
+                )
+
+        mock_client.assert_not_called()
+
+    def test_save_uses_default_config_when_none_is_provided(self, config, raw_df):
+        df = transform(raw_df)
+        mock_s3 = MagicMock()
+        with (
+            patch(
+                "src.transform.process_matches.Config", return_value=config
+            ) as mock_config,
+            patch("src.transform.process_matches.boto3.client", return_value=mock_s3),
+        ):
+            save_as_parquet(df, "my-bucket", "curated/PL/2023/matches.parquet")
+
+        mock_config.assert_called_once_with()
 
     def test_returns_s3_uri(self, config, raw_df):
         df = transform(raw_df)
@@ -482,6 +761,7 @@ class TestSaveAsParquet:
             save_as_parquet(pd.DataFrame(), "bucket", "key.parquet", config=config)
 
     def test_uses_region_from_config(self, config, raw_df):
+        config = replace(config, aws_region=" eu-west-1 ")
         df = transform(raw_df)
         mock_s3 = MagicMock()
 
@@ -503,6 +783,40 @@ class TestSaveAsParquet:
 class TestBuildCuratedKey:
     """Tests de la fonction build_curated_key."""
 
+    @pytest.mark.parametrize("competition_code", [None, 42, object()])
+    def test_rejects_non_string_competition_code(self, competition_code):
+        with pytest.raises(ValueError, match="chaîne de caractères"):
+            build_curated_key(competition_code, 2024)
+
+    @pytest.mark.parametrize("season", [None, 2024.0, True, object()])
+    def test_rejects_invalid_season_type(self, season):
+        with pytest.raises(ValueError, match="entier ou une chaîne"):
+            build_curated_key("PL", season)
+
+    @pytest.mark.parametrize(
+        ("competition_code", "season", "message"),
+        [
+            (" ", 2024, "code de compétition"),
+            ("PL", " ", "saison"),
+        ],
+    )
+    def test_rejects_empty_key_components(self, competition_code, season, message):
+        with pytest.raises(ValueError, match=message):
+            build_curated_key(competition_code, season)
+
+    @pytest.mark.parametrize(
+        ("competition_code", "season"),
+        [
+            ("PL/archive", 2024),
+            (r"PL\archive", 2024),
+            ("PL", "2024/archive"),
+            ("PL", r"2024\archive"),
+        ],
+    )
+    def test_rejects_path_separators(self, competition_code, season):
+        with pytest.raises(ValueError, match="séparateur"):
+            build_curated_key(competition_code, season)
+
     def test_format_with_int_season(self):
         assert build_curated_key("PL", 2023) == "curated/PL/2023/matches.parquet"
 
@@ -514,3 +828,43 @@ class TestBuildCuratedKey:
 
     def test_ends_with_parquet(self):
         assert build_curated_key("SA", 2021).endswith(".parquet")
+
+
+class TestFilterBySeason:
+    """Tests du filtrage empêchant de mélanger les saisons."""
+
+    @pytest.mark.parametrize("df", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, df):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            filter_by_season(df, 2025)
+
+    def test_filters_integer_and_string_seasons(self):
+        df = pd.DataFrame(
+            {
+                "match_id": [1, 2, 3],
+                "season": [2024, "2025", 2025],
+            }
+        )
+
+        result = filter_by_season(df, 2025)
+
+        assert result["match_id"].tolist() == [2, 3]
+
+    def test_returns_independent_copy(self):
+        df = pd.DataFrame({"match_id": [1], "season": [2025]})
+
+        result = filter_by_season(df, 2025)
+        result["league_code"] = "PL"
+
+        assert "league_code" not in df.columns
+
+    def test_raises_when_season_column_is_missing(self):
+        with pytest.raises(ValueError, match="Colonne 'season' absente"):
+            filter_by_season(pd.DataFrame({"match_id": [1]}), 2025)
+
+    @pytest.mark.parametrize("season", ["", " \n ", "unknown", None])
+    def test_rejects_invalid_requested_season(self, season):
+        df = pd.DataFrame({"match_id": [1], "season": [2025]})
+
+        with pytest.raises(ValueError, match="saison doit être une année entière"):
+            filter_by_season(df, season)

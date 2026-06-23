@@ -48,3 +48,8 @@ class Config:
     aws_region: str = field(default_factory=lambda: _env("AWS_REGION", "eu-west-1"))
     athena_database: str = field(default_factory=lambda: _env("ATHENA_DATABASE"))
     athena_output_s3: str = field(default_factory=lambda: _env("ATHENA_OUTPUT_S3"))
+
+    @classmethod
+    def load(cls, **overrides: str) -> "Config":
+        """Construit la configuration depuis l'environnement et les surcharges."""
+        return cls(**overrides)

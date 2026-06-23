@@ -28,6 +28,13 @@ MAX_WAIT_SECONDS = 300
 _TERMINAL_STATES = frozenset({"SUCCEEDED", "FAILED", "CANCELLED"})
 
 
+def _require_non_empty_string(value: object, label: str) -> str:
+    """Normalise une chaîne obligatoire ou lève une erreur explicite."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} ne peut pas être vide")
+    return value.strip()
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -56,13 +63,19 @@ def run_athena_query(
         ``QueryExecutionId`` Athena (str).
 
     Raises:
+        ValueError: La requête SQL est vide.
         RuntimeError: La requête s'est terminée en état FAILED ou CANCELLED.
         TimeoutError: ``MAX_WAIT_SECONDS`` dépassés sans résultat.
     """
+    query = _require_non_empty_string(query, "La requête SQL")
+    database = _require_non_empty_string(database, "Le nom de la base Athena")
+    output_s3 = _require_non_empty_string(output_s3, "L'emplacement S3 des résultats")
+
     if config is None:
         config = Config()
+    aws_region = _require_non_empty_string(config.aws_region, "La région AWS")
 
-    client = boto3.client("athena", region_name=config.aws_region)
+    client = boto3.client("athena", region_name=aws_region)
 
     logger.info("Soumission requête Athena — base : %s", database)
     response = client.start_query_execution(
@@ -70,7 +83,10 @@ def run_athena_query(
         QueryExecutionContext={"Database": database},
         ResultConfiguration={"OutputLocation": output_s3},
     )
-    qeid: str = response["QueryExecutionId"]
+    qeid = response.get("QueryExecutionId")
+    if not isinstance(qeid, str) or not qeid.strip():
+        raise RuntimeError("Réponse Athena invalide : QueryExecutionId absent ou vide")
+    qeid = qeid.strip()
     logger.info("QueryExecutionId : %s", qeid)
 
     _wait_for_completion(client, qeid)
@@ -96,10 +112,15 @@ def results_to_dataframe(
         DataFrame dont toutes les colonnes sont de type ``object`` (str / None).
         Appeler ``pd.to_numeric``, ``pd.to_datetime``, etc. pour convertir.
     """
+    query_execution_id = _require_non_empty_string(
+        query_execution_id, "L'identifiant d'exécution Athena"
+    )
+
     if config is None:
         config = Config()
+    aws_region = _require_non_empty_string(config.aws_region, "La région AWS")
 
-    client = boto3.client("athena", region_name=config.aws_region)
+    client = boto3.client("athena", region_name=aws_region)
 
     columns: list[str] | None = None
     rows: list[list] = []
@@ -117,9 +138,17 @@ def results_to_dataframe(
         result_rows = resp["ResultSet"]["Rows"]
 
         if columns is None:
-            # Première page : la ligne 0 contient les noms de colonnes.
-            columns = [cell.get("VarCharValue", "") for cell in result_rows[0]["Data"]]
-            result_rows = result_rows[1:]
+            metadata = resp["ResultSet"].get("ResultSetMetadata", {})
+            column_info = metadata.get("ColumnInfo", [])
+            columns = [column["Name"] for column in column_info]
+
+            # Athena inclut normalement l'en-tête comme première ligne.
+            if result_rows:
+                if not columns:
+                    columns = [
+                        cell.get("VarCharValue", "") for cell in result_rows[0]["Data"]
+                    ]
+                result_rows = result_rows[1:]
             logger.info(
                 "Colonnes Athena (%d) : %s",
                 len(columns),
@@ -128,7 +157,9 @@ def results_to_dataframe(
 
         for row in result_rows:
             # cell vide ({}) → NULL Athena → None dans le DataFrame
-            rows.append([cell.get("VarCharValue") for cell in row["Data"]])
+            values = [cell.get("VarCharValue") for cell in row.get("Data", [])]
+            values = (values + [None] * len(columns))[: len(columns)]
+            rows.append(values)
 
         next_token = resp.get("NextToken")
         if not next_token:
@@ -160,10 +191,7 @@ def _wait_for_completion(client, query_execution_id: str) -> None:
     secondes jusqu'à atteindre un état terminal.
     """
     elapsed = 0
-    while elapsed < MAX_WAIT_SECONDS:
-        time.sleep(POLL_INTERVAL_SECONDS)
-        elapsed += POLL_INTERVAL_SECONDS
-
+    while elapsed <= MAX_WAIT_SECONDS:
         resp = client.get_query_execution(QueryExecutionId=query_execution_id)
         status = resp["QueryExecution"]["Status"]
         state: str = status["State"]
@@ -190,6 +218,11 @@ def _wait_for_completion(client, query_execution_id: str) -> None:
                 f"Requête Athena {query_execution_id[:8]} "
                 f"terminée en état {state} : {reason}"
             )
+
+        if elapsed == MAX_WAIT_SECONDS:
+            break
+        time.sleep(POLL_INTERVAL_SECONDS)
+        elapsed = min(elapsed + POLL_INTERVAL_SECONDS, MAX_WAIT_SECONDS)
 
     raise TimeoutError(
         f"Requête Athena {query_execution_id[:8]} toujours en cours "

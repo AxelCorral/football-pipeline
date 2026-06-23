@@ -1,6 +1,5 @@
 """Streamlit dashboard — Football Pipeline (5 grandes ligues européennes)."""
 
-import sys
 import tempfile
 from pathlib import Path
 
@@ -8,11 +7,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-sys.path.insert(0, str(Path(__file__).parent))
-
 from src.ml.evaluate import baseline_accuracy
 from src.ml.features import FEATURE_COLS, compute_features
-from src.ml.train import LABEL_MAP, train_model
+from src.ml.train import train_model
 
 CACHE_PATH = Path("data/cache/matches_all_2025.parquet")
 
@@ -147,7 +144,10 @@ st.set_page_config(
 
 _CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital@1');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
 
 /* ── Reset & base ── */
 *, *::before, *::after {
@@ -517,7 +517,12 @@ hr {
 }
 .stack-row-item { padding: 8px 0; border-bottom: 1px solid #1A1A1A; }
 .stack-name { font-family: 'DM Sans', sans-serif; font-size: 0.88rem; color: #F5F5F5; }
-.stack-desc { font-family: 'DM Sans', sans-serif; font-size: 0.82rem; color: #555555; margin-top: 1px; }
+.stack-desc {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    color: #555555;
+    margin-top: 1px;
+}
 </style>
 """
 
@@ -587,14 +592,14 @@ def compute_standings(finished: pd.DataFrame, mode: str) -> pd.DataFrame:
             m = finished[finished["home_team"] == team]
             w = int((m["result"] == "H").sum())
             d = int((m["result"] == "D").sum())
-            l = int((m["result"] == "A").sum())
+            losses = int((m["result"] == "A").sum())
             gf = int(m["home_goals"].fillna(0).sum())
             ga = int(m["away_goals"].fillna(0).sum())
         elif mode == "away":
             m = finished[finished["away_team"] == team]
             w = int((m["result"] == "A").sum())
             d = int((m["result"] == "D").sum())
-            l = int((m["result"] == "H").sum())
+            losses = int((m["result"] == "H").sum())
             gf = int(m["away_goals"].fillna(0).sum())
             ga = int(m["home_goals"].fillna(0).sum())
         else:
@@ -602,7 +607,7 @@ def compute_standings(finished: pd.DataFrame, mode: str) -> pd.DataFrame:
             am = finished[finished["away_team"] == team]
             w = int((hm["result"] == "H").sum()) + int((am["result"] == "A").sum())
             d = int((hm["result"] == "D").sum()) + int((am["result"] == "D").sum())
-            l = int((hm["result"] == "A").sum()) + int((am["result"] == "H").sum())
+            losses = int((hm["result"] == "A").sum()) + int((am["result"] == "H").sum())
             gf = int(hm["home_goals"].fillna(0).sum()) + int(
                 am["away_goals"].fillna(0).sum()
             )
@@ -612,10 +617,10 @@ def compute_standings(finished: pd.DataFrame, mode: str) -> pd.DataFrame:
         rows.append(
             {
                 "Équipe": team,
-                "J": w + d + l,
+                "J": w + d + losses,
                 "G": w,
                 "N": d,
-                "P": l,
+                "P": losses,
                 "BP": gf,
                 "BC": ga,
                 "Diff": gf - ga,
@@ -678,8 +683,8 @@ def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
                 '<div style="border-top:1px dashed #2E2E2E;position:relative;'
                 'height:1px;margin:6px 0">'
                 '<span style="position:absolute;right:0;top:-9px;background:#111111;'
-                'padding:0 0 0 8px;font-family:\'DM Sans\',sans-serif;font-size:0.65rem;'
-                'font-weight:600;letter-spacing:0.1em;text-transform:uppercase;'
+                "padding:0 0 0 8px;font-family:'DM Sans',sans-serif;font-size:0.65rem;"
+                "font-weight:600;letter-spacing:0.1em;text-transform:uppercase;"
                 'color:#C8A96E;white-space:nowrap">Champion</span></div>'
                 "</td></tr>"
             )
@@ -694,7 +699,7 @@ def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
         diff = row["Diff"]
         diff_str = f"+{diff}" if diff > 0 else str(diff)
         rows_html.append(
-            f'<tr>'
+            f"<tr>"
             f'<td class="{rank_cls}">{rank}</td>'
             f'<td class="logo">{img}</td>'
             f'<td class="l">{row["Équipe"]}</td>'
@@ -737,11 +742,11 @@ def _prob_bar(label: str, prob: float, color: str, predicted: bool) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 st.sidebar.markdown(
-    '<p style="font-family:\'DM Serif Display\',serif;font-size:1.15rem;'
+    "<p style=\"font-family:'DM Serif Display',serif;font-size:1.15rem;"
     'font-weight:400;color:#F5F5F5;margin:0 0 2px;line-height:1.2">'
     "Football Pipeline</p>"
-    '<p style="font-family:\'DM Sans\',sans-serif;font-size:0.65rem;'
-    'font-weight:600;text-transform:uppercase;letter-spacing:0.14em;'
+    "<p style=\"font-family:'DM Sans',sans-serif;font-size:0.65rem;"
+    "font-weight:600;text-transform:uppercase;letter-spacing:0.14em;"
     'color:#555555;margin:0 0 16px">2025 / 26 Season</p>',
     unsafe_allow_html=True,
 )
@@ -770,8 +775,8 @@ if "league_code" in df.columns:
     codes = sorted(df["league_code"].dropna().unique().tolist())
     st.sidebar.markdown(
         '<div style="border-top:1px solid #2E2E2E;margin:12px 0 10px"></div>'
-        '<p style="font-family:\'DM Sans\',sans-serif;font-size:0.62rem;'
-        'font-weight:600;text-transform:uppercase;letter-spacing:0.14em;'
+        "<p style=\"font-family:'DM Sans',sans-serif;font-size:0.62rem;"
+        "font-weight:600;text-transform:uppercase;letter-spacing:0.14em;"
         'color:#555555;margin-bottom:6px">Competition</p>',
         unsafe_allow_html=True,
     )
@@ -788,9 +793,9 @@ if "league_code" in df.columns:
         selected_league = st.sidebar.selectbox(
             "Competition",
             ["All"] + codes,
-            format_func=lambda x: "All competitions"
-            if x == "All"
-            else COMPETITION_NAMES.get(x, x),
+            format_func=lambda x: (
+                "All competitions" if x == "All" else COMPETITION_NAMES.get(x, x)
+            ),
             label_visibility="collapsed",
             key="comp_all",
         )
@@ -804,7 +809,7 @@ _total_l = int(_full["league_code"].nunique()) if "league_code" in _full.columns
 
 st.sidebar.markdown(
     '<div style="border-top:1px solid #2E2E2E;margin:16px 0 10px"></div>'
-    f'<p style="font-family:\'DM Sans\',sans-serif;font-size:0.68rem;'
+    f"<p style=\"font-family:'DM Sans',sans-serif;font-size:0.68rem;"
     f'color:#555555;margin:0">{_total_m:,} matches · {_total_l} leagues</p>',
     unsafe_allow_html=True,
 )
@@ -822,7 +827,7 @@ competition_label = (
 
 if page == "Overview":
     st.markdown(
-        f'<h1>{competition_label}</h1>',
+        f"<h1>{competition_label}</h1>",
         unsafe_allow_html=True,
     )
 
@@ -864,9 +869,7 @@ if page == "Overview":
         .rename(columns={"mean": "avg_goals", "count": "n_matches"})
     )
     weekly["label"] = (
-        weekly["year"].astype(str)
-        + "-W"
-        + weekly["week"].astype(str).str.zfill(2)
+        weekly["year"].astype(str) + "-W" + weekly["week"].astype(str).str.zfill(2)
     )
 
     fig = go.Figure()
@@ -906,9 +909,7 @@ if page == "Overview":
     st.plotly_chart(fig, use_container_width=True)
 
     if "league_code" in finished.columns:
-        st.markdown(
-            '<span class="sl">By competition</span>', unsafe_allow_html=True
-        )
+        st.markdown('<span class="sl">By competition</span>', unsafe_allow_html=True)
         lg_stats = (
             finished.groupby("league_code")
             .agg(n=("match_id", "count"), goals=("total_goals", "sum"))
@@ -924,7 +925,7 @@ if page == "Overview":
             r = r.iloc[0]
             rows_html += (
                 f"<tr>"
-                f'<td>{COMPETITION_NAMES.get(code, code)}</td>'
+                f"<td>{COMPETITION_NAMES.get(code, code)}</td>"
                 f'<td class="mono">{int(r["n"]):,}</td>'
                 f'<td class="mono">{int(r["goals"]):,}</td>'
                 f'<td class="mono">{r["avg"]:.2f}</td>'
@@ -933,7 +934,7 @@ if page == "Overview":
         st.markdown(
             '<table class="league-table">'
             "<thead><tr>"
-            '<th>Competition</th><th>Matches</th><th>Goals</th><th>Avg/match</th>'
+            "<th>Competition</th><th>Matches</th><th>Goals</th><th>Avg/match</th>"
             "</tr></thead>"
             f"<tbody>{rows_html}</tbody></table>",
             unsafe_allow_html=True,
@@ -946,7 +947,7 @@ if page == "Overview":
 
 elif page == "Standings":
     st.markdown(
-        f'<h1>{competition_label}</h1>',
+        f"<h1>{competition_label}</h1>",
         unsafe_allow_html=True,
     )
 
@@ -977,7 +978,19 @@ elif page == "Standings":
         disp["GF/90"] = (disp["BP"] / played).round(2)
         disp["GA/90"] = (disp["BC"] / played).round(2)
         disp["+/-/90"] = (disp["Diff"] / played).round(2)
-        display_cols = ["Rank", "Crest", "Équipe", "J", "G", "N", "P", "GF/90", "GA/90", "+/-/90", "Pts"]
+        display_cols = [
+            "Rank",
+            "Crest",
+            "Équipe",
+            "J",
+            "G",
+            "N",
+            "P",
+            "GF/90",
+            "GA/90",
+            "+/-/90",
+            "Pts",
+        ]
         col_cfg = {
             "Rank": st.column_config.NumberColumn("#", width="small"),
             "Crest": st.column_config.ImageColumn("", width="small"),
@@ -986,13 +999,31 @@ elif page == "Standings":
             "G": st.column_config.NumberColumn("W", width="small"),
             "N": st.column_config.NumberColumn("D", width="small"),
             "P": st.column_config.NumberColumn("L", width="small"),
-            "GF/90": st.column_config.NumberColumn("GF/90", format="%.2f", width="small"),
-            "GA/90": st.column_config.NumberColumn("GA/90", format="%.2f", width="small"),
-            "+/-/90": st.column_config.NumberColumn("+/−/90", format="%.2f", width="small"),
+            "GF/90": st.column_config.NumberColumn(
+                "GF/90", format="%.2f", width="small"
+            ),
+            "GA/90": st.column_config.NumberColumn(
+                "GA/90", format="%.2f", width="small"
+            ),
+            "+/-/90": st.column_config.NumberColumn(
+                "+/−/90", format="%.2f", width="small"
+            ),
             "Pts": st.column_config.NumberColumn("Pts", width="small"),
         }
     else:
-        display_cols = ["Rank", "Crest", "Équipe", "J", "G", "N", "P", "BP", "BC", "Diff", "Pts"]
+        display_cols = [
+            "Rank",
+            "Crest",
+            "Équipe",
+            "J",
+            "G",
+            "N",
+            "P",
+            "BP",
+            "BC",
+            "Diff",
+            "Pts",
+        ]
         col_cfg = {
             "Rank": st.column_config.NumberColumn("#", width="small"),
             "Crest": st.column_config.ImageColumn("", width="small"),
@@ -1044,7 +1075,7 @@ elif page == "Prediction":
     competition_label = COMPETITION_NAMES.get(selected_league, selected_league)
 
     st.markdown(
-        f'<h1>{competition_label} — Prediction</h1>',
+        f"<h1>{competition_label} — Prediction</h1>",
         unsafe_allow_html=True,
     )
 
@@ -1072,7 +1103,9 @@ elif page == "Prediction":
     with col2:
         st.markdown('<span class="pred-label">Away</span>', unsafe_allow_html=True)
         away_options = [t for t in teams if t != home_team]
-        away_team = st.selectbox("Away team", away_options, label_visibility="collapsed")
+        away_team = st.selectbox(
+            "Away team", away_options, label_visibility="collapsed"
+        )
         away_crest = TEAM_CRESTS.get(away_team)
         if away_crest:
             st.markdown(
@@ -1132,7 +1165,7 @@ elif page == "Prediction":
 # ─────────────────────────────────────────────────────────────────────────────
 
 elif page == "About":
-    st.markdown('<h1>About</h1>', unsafe_allow_html=True)
+    st.markdown("<h1>About</h1>", unsafe_allow_html=True)
 
     st.markdown(
         '<div class="about-body">'
@@ -1176,9 +1209,7 @@ elif page == "About":
         f"</div>"
         for name, desc in stack
     )
-    st.markdown(
-        f'<div class="stack-grid">{items_html}</div>', unsafe_allow_html=True
-    )
+    st.markdown(f'<div class="stack-grid">{items_html}</div>', unsafe_allow_html=True)
 
     st.markdown(
         '<span class="sl">Links</span>'

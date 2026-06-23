@@ -22,7 +22,11 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import Config  # noqa: E402
-from src.transform.process_matches import load_raw_from_s3, transform  # noqa: E402
+from src.transform.process_matches import (  # noqa: E402
+    filter_by_season,
+    load_raw_from_s3,
+    transform,
+)
 
 COMPETITIONS = ["PL", "FL1", "BL1", "SA", "PD"]
 COMPETITION_NAMES = {
@@ -54,7 +58,10 @@ def main(season: int = 2025) -> None:
             print("  ✗ Aucune donnée disponible sur S3\n")
             continue
 
-        df = transform(df_raw)
+        df = filter_by_season(transform(df_raw), season)
+        if df.empty:
+            print(f"  ✗ Aucun match pour la saison {season}\n")
+            continue
         df["league_code"] = code
         n_fin = int((df["status"] == "FINISHED").sum())
         print(f"  ✓ {len(df)} matchs ({n_fin} terminés)")

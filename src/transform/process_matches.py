@@ -64,11 +64,30 @@ def load_raw_from_s3(
     Returns:
         DataFrame aplati (``pd.json_normalize``) ; vide si aucun fichier.
     """
+    if not isinstance(bucket, str):
+        raise ValueError("Le nom du bucket S3 doit être une chaîne de caractères")
+    bucket = bucket.strip()
+    if not bucket:
+        raise ValueError("Le nom du bucket S3 ne peut pas être vide")
+
+    if not isinstance(competition_code, str):
+        raise ValueError("Le code de compétition doit être une chaîne de caractères")
+    competition_code = competition_code.strip()
+    if not competition_code:
+        raise ValueError("Le code de compétition ne peut pas être vide")
+    if "/" in competition_code or "\\" in competition_code:
+        raise ValueError("Le code de compétition ne peut pas contenir de séparateur")
+
     if config is None:
         config = Config()
+    if not isinstance(config.aws_region, str):
+        raise ValueError("La région AWS doit être une chaîne de caractères")
+    aws_region = config.aws_region.strip()
+    if not aws_region:
+        raise ValueError("La région AWS ne peut pas être vide")
 
     prefix = f"raw/{competition_code}/"
-    s3 = boto3.client("s3", region_name=config.aws_region)
+    s3 = boto3.client("s3", region_name=aws_region)
     all_matches: list[dict[str, Any]] = []
 
     paginator = s3.get_paginator("list_objects_v2")
@@ -80,15 +99,24 @@ def load_raw_from_s3(
                 continue
             logger.info("Lecture s3://%s/%s", bucket, key)
             body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
-            data = json.loads(body)
-            if isinstance(data, list):
-                all_matches.extend(data)
-            else:
-                logger.warning(
-                    "Format inattendu dans %s (attendu list, reçu %s)",
-                    key,
-                    type(data).__name__,
+            try:
+                data = json.loads(body)
+            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                raise ValueError(f"JSON invalide dans s3://{bucket}/{key}") from exc
+            if not isinstance(data, list):
+                raise ValueError(
+                    "Format JSON invalide dans "
+                    f"s3://{bucket}/{key} : liste attendue, "
+                    f"{type(data).__name__} reçu"
                 )
+
+            for index, match in enumerate(data):
+                if not isinstance(match, dict):
+                    raise ValueError(
+                        "Match invalide dans "
+                        f"s3://{bucket}/{key} à l'index {index} : objet attendu"
+                    )
+                all_matches.append(match)
 
     if not all_matches:
         logger.warning("Aucun match trouvé sous s3://%s/%s", bucket, prefix)
@@ -114,6 +142,8 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame normalisé avec types corrects.
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les données brutes doivent être un DataFrame pandas")
     if df.empty:
         return pd.DataFrame(columns=_OUTPUT_COLUMNS)
 
@@ -143,6 +173,14 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     out["referee"] = _extract_referee(df)
     out["venue"] = _col(df, "venue")
 
+    duplicate_ids = out["match_id"].notna() & out["match_id"].duplicated(keep="last")
+    if duplicate_ids.any():
+        logger.info(
+            "Transform : %d snapshot(s) dupliqué(s) ignoré(s)",
+            duplicate_ids.sum(),
+        )
+        out = out.loc[~duplicate_ids].copy()
+
     logger.info(
         "Transform : %d lignes (%d avec score, %d sans)",
         len(out),
@@ -157,7 +195,40 @@ def build_curated_key(competition_code: str, season: int | str) -> str:
 
     Format : ``curated/{competition_code}/{season}/matches.parquet``
     """
+    if not isinstance(competition_code, str):
+        raise ValueError("Le code de compétition doit être une chaîne de caractères")
+    if isinstance(season, bool) or not isinstance(season, (int, str)):
+        raise ValueError("La saison doit être un entier ou une chaîne de caractères")
+
+    competition_code = competition_code.strip()
+    if not competition_code:
+        raise ValueError("Le code de compétition ne peut pas être vide")
+    if "/" in competition_code or "\\" in competition_code:
+        raise ValueError("Le code de compétition ne peut pas contenir de séparateur")
+
+    season = str(season).strip()
+    if not season:
+        raise ValueError("La saison ne peut pas être vide")
+    if "/" in season or "\\" in season:
+        raise ValueError("La saison ne peut pas contenir de séparateur")
+
     return f"curated/{competition_code}/{season}/matches.parquet"
+
+
+def filter_by_season(df: pd.DataFrame, season: int | str) -> pd.DataFrame:
+    """Retourne uniquement les matchs de la saison demandée."""
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les matchs à filtrer doivent être un DataFrame pandas")
+    if "season" not in df.columns:
+        raise ValueError("Colonne 'season' absente du DataFrame transformé")
+
+    try:
+        requested_season = int(str(season).strip())
+    except (TypeError, ValueError) as exc:
+        raise ValueError("La saison doit être une année entière") from exc
+
+    normalized_season = pd.to_numeric(df["season"], errors="coerce")
+    return df.loc[normalized_season.eq(requested_season)].copy()
 
 
 def save_as_parquet(
@@ -181,18 +252,37 @@ def save_as_parquet(
     Raises:
         ValueError: Si ``df`` est vide.
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les données à sauvegarder doivent être un DataFrame pandas")
     if df.empty:
         raise ValueError("Impossible de sauvegarder un DataFrame vide")
 
+    if not isinstance(bucket, str):
+        raise ValueError("Le nom du bucket S3 doit être une chaîne de caractères")
+    bucket = bucket.strip()
+    if not bucket:
+        raise ValueError("Le nom du bucket S3 ne peut pas être vide")
+
+    if not isinstance(key, str):
+        raise ValueError("La clé S3 doit être une chaîne de caractères")
+    key = key.strip().strip("/")
+    if not key:
+        raise ValueError("La clé S3 ne peut pas être vide")
+
     if config is None:
         config = Config()
+    if not isinstance(config.aws_region, str):
+        raise ValueError("La région AWS doit être une chaîne de caractères")
+    aws_region = config.aws_region.strip()
+    if not aws_region:
+        raise ValueError("La région AWS ne peut pas être vide")
 
     buf = io.BytesIO()
     df.to_parquet(buf, index=False, engine="pyarrow")
     buf.seek(0)
     payload = buf.read()
 
-    s3 = boto3.client("s3", region_name=config.aws_region)
+    s3 = boto3.client("s3", region_name=aws_region)
     logger.info(
         "Upload Parquet s3://%s/%s (%d octets, %d lignes)",
         bucket,

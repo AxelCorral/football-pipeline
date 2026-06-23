@@ -3,8 +3,9 @@
 import pandas as pd
 import pytest
 
+import src.ml.train as train_module
 from src.ml.evaluate import baseline_accuracy
-from src.ml.features import FEATURE_COLS, compute_features
+from src.ml.features import FEATURE_COLS, REQUIRED_COLUMNS, compute_features
 from src.ml.train import LABEL_MAP, train_model
 
 # ---------------------------------------------------------------------------
@@ -74,6 +75,11 @@ def df_features(df_matches):
 
 
 class TestComputeFeatures:
+    @pytest.mark.parametrize("invalid_input", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, invalid_input):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            compute_features(invalid_input)
+
     def test_filters_to_finished_only(self, df_with_unfinished):
         result = compute_features(df_with_unfinished)
         assert (result["status"] == "FINISHED").all()
@@ -123,6 +129,21 @@ class TestComputeFeatures:
         for col in FEATURE_COLS:
             assert col in result.columns
 
+    @pytest.mark.parametrize("missing_column", sorted(REQUIRED_COLUMNS))
+    def test_rejects_missing_required_column(self, df_matches, missing_column):
+        incomplete = df_matches.drop(columns=missing_column)
+
+        with pytest.raises(ValueError, match=rf"absentes.*{missing_column}"):
+            compute_features(incomplete)
+
+    @pytest.mark.parametrize("invalid_result", ["UNKNOWN", None])
+    def test_rejects_invalid_finished_result(self, df_matches, invalid_result):
+        invalid = df_matches.copy()
+        invalid.loc[invalid.index[0], "result"] = invalid_result
+
+        with pytest.raises(ValueError, match="résultat non supportés"):
+            compute_features(invalid)
+
 
 # ---------------------------------------------------------------------------
 # train_model
@@ -130,6 +151,20 @@ class TestComputeFeatures:
 
 
 class TestTrainModel:
+    @pytest.mark.parametrize("invalid_input", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, invalid_input, tmp_path):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            train_model(invalid_input, models_dir=tmp_path)
+
+    @pytest.mark.parametrize("missing_column", FEATURE_COLS + ["result"])
+    def test_rejects_missing_required_column(
+        self, df_features, missing_column, tmp_path
+    ):
+        incomplete = df_features.drop(columns=missing_column)
+
+        with pytest.raises(ValueError, match=rf"absentes.*{missing_column}"):
+            train_model(incomplete, models_dir=tmp_path)
+
     def test_returns_model_accuracy_cm(self, df_features, tmp_path):
         model, acc, cm = train_model(df_features, models_dir=tmp_path)
         assert model is not None
@@ -139,6 +174,16 @@ class TestTrainModel:
     def test_model_file_saved(self, df_features, tmp_path):
         train_model(df_features, models_dir=tmp_path)
         assert len(list(tmp_path.glob("*.joblib"))) == 1
+
+    def test_accepts_string_models_directory(self, df_features, tmp_path):
+        train_model(df_features, models_dir=str(tmp_path))
+
+        assert len(list(tmp_path.glob("*.joblib"))) == 1
+
+    @pytest.mark.parametrize("invalid_models_dir", [None, 42, []])
+    def test_rejects_invalid_models_directory(self, df_features, invalid_models_dir):
+        with pytest.raises(TypeError, match="répertoire des modèles"):
+            train_model(df_features, models_dir=invalid_models_dir)
 
     def test_confusion_matrix_labels(self, df_features, tmp_path):
         """La matrice de confusion doit couvrir H=0, D=1, A=2."""
@@ -161,9 +206,54 @@ class TestTrainModel:
         with pytest.raises(ValueError, match="insuffisantes"):
             train_model(tiny, models_dir=tmp_path)
 
+    def test_raises_clear_error_on_unknown_result_label(self, df_features, tmp_path):
+        invalid = df_features.dropna(subset=FEATURE_COLS + ["result"]).copy()
+        invalid.loc[invalid.index[0], "result"] = "UNKNOWN"
+
+        with pytest.raises(ValueError, match="non supportés.*UNKNOWN"):
+            train_model(invalid, models_dir=tmp_path)
+
     def test_model_can_predict(self, df_features, tmp_path):
         model, _, _ = train_model(df_features, models_dir=tmp_path)
         assert hasattr(model, "predict")
+
+    def test_uses_viable_candidate_when_logistic_regression_cannot_train(
+        self, tmp_path
+    ):
+        rows = 10
+        features = pd.DataFrame(
+            {
+                column: [float(index + 1) for index in range(rows)]
+                for column in FEATURE_COLS
+            }
+        )
+        # Le split temporel place une seule classe dans les 8 lignes train.
+        features["result"] = ["H"] * 8 + ["D"] * 2
+
+        model, acc, cm = train_model(features, models_dir=tmp_path)
+
+        assert model.__class__.__name__ == "RandomForestClassifier"
+        assert 0.0 <= acc <= 1.0
+        assert cm.shape == (3, 3)
+
+    def test_raises_when_all_candidate_models_fail(
+        self, df_features, tmp_path, monkeypatch
+    ):
+        class FailingModel:
+            def fit(self, X, y):
+                raise ValueError("training failed")
+
+        monkeypatch.setattr(
+            train_module, "LogisticRegression", lambda **kwargs: FailingModel()
+        )
+        monkeypatch.setattr(
+            train_module, "RandomForestClassifier", lambda **kwargs: FailingModel()
+        )
+
+        with pytest.raises(ValueError, match="Aucun modèle"):
+            train_model(df_features, models_dir=tmp_path)
+
+        assert list(tmp_path.glob("*.joblib")) == []
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +262,11 @@ class TestTrainModel:
 
 
 class TestBaselineAccuracy:
+    @pytest.mark.parametrize("invalid_input", [None, [], {}])
+    def test_rejects_non_dataframe_input(self, invalid_input):
+        with pytest.raises(TypeError, match="DataFrame pandas"):
+            baseline_accuracy(invalid_input)
+
     def test_returns_float(self, df_matches):
         assert isinstance(baseline_accuracy(df_matches), float)
 
@@ -187,6 +282,22 @@ class TestBaselineAccuracy:
     def test_empty_dataframe_returns_zero(self):
         empty = pd.DataFrame(columns=["status", "result"])
         assert baseline_accuracy(empty) == 0.0
+
+    @pytest.mark.parametrize("missing_column", ["status", "result"])
+    def test_rejects_missing_required_column(self, missing_column):
+        df = pd.DataFrame({"status": ["FINISHED"], "result": ["H"]}).drop(
+            columns=missing_column
+        )
+
+        with pytest.raises(ValueError, match=rf"absentes.*{missing_column}"):
+            baseline_accuracy(df)
+
+    @pytest.mark.parametrize("invalid_result", ["UNKNOWN", None])
+    def test_rejects_invalid_finished_result(self, invalid_result):
+        df = pd.DataFrame({"status": ["FINISHED"], "result": [invalid_result]})
+
+        with pytest.raises(ValueError, match="résultat non supportés"):
+            baseline_accuracy(df)
 
     def test_all_home_wins(self):
         df = pd.DataFrame({"status": ["FINISHED"] * 4, "result": ["H"] * 4})

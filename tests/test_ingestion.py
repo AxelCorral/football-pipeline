@@ -6,6 +6,7 @@ Aucun appel réel : requests et boto3 sont entièrement mockés.
 """
 
 import json
+from dataclasses import replace
 from datetime import date
 from unittest.mock import MagicMock, call, patch
 
@@ -47,11 +48,13 @@ def sample_matches() -> list[dict]:
     ]
 
 
-def _mock_response(status_code: int = 200, json_body: dict | None = None) -> MagicMock:
+def _mock_response(
+    status_code: int = 200, json_body: object | None = None
+) -> MagicMock:
     """Fabrique une fausse réponse requests."""
     resp = MagicMock()
     resp.status_code = status_code
-    resp.json.return_value = json_body or {}
+    resp.json.return_value = json_body if json_body is not None else {}
     if status_code >= 400:
         http_err = requests.HTTPError(response=resp)
         resp.raise_for_status.side_effect = http_err
@@ -63,6 +66,75 @@ def _mock_response(status_code: int = 200, json_body: dict | None = None) -> Mag
 class TestGetMatches:
     """Tests de la fonction get_matches."""
 
+    def test_rejects_non_string_competition_before_http_call(self, config):
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            with pytest.raises(ValueError, match="code de compétition.*chaîne"):
+                get_matches(None, config=config)
+
+        mock_get.assert_not_called()
+
+    def test_rejects_empty_competition_before_http_call(self, config):
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            with pytest.raises(ValueError, match="code de compétition"):
+                get_matches(" ", config=config)
+
+        mock_get.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("football_api_base_url", " / ", "URL de l'API football"),
+            ("api_key", " \n ", "token de l'API football"),
+        ],
+    )
+    def test_rejects_empty_http_configuration_before_request(
+        self, config, field, value, message
+    ):
+        config = replace(config, **{field: value})
+
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            with pytest.raises(ValueError, match=message):
+                get_matches("PL", config=config)
+
+        mock_get.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            (
+                "football_api_base_url",
+                None,
+                "URL de l'API football.*chaîne",
+            ),
+            ("api_key", 123, "token de l'API football.*chaîne"),
+        ],
+    )
+    def test_rejects_non_string_http_configuration_before_request(
+        self, config, field, value, message
+    ):
+        config = replace(config, **{field: value})
+
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            with pytest.raises(ValueError, match=message):
+                get_matches("PL", config=config)
+
+        mock_get.assert_not_called()
+
+    def test_normalizes_http_configuration(self, config):
+        config = replace(
+            config,
+            football_api_base_url=" https://api.football-data.org/v4/// ",
+            api_key=" test-api-key ",
+        )
+
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(200, {"matches": []})
+            get_matches("PL", config=config)
+
+        url, kwargs = mock_get.call_args
+        assert url[0] == "https://api.football-data.org/v4/competitions/PL/matches"
+        assert kwargs["headers"]["X-Auth-Token"] == "test-api-key"
+
     def test_returns_matches_list(self, config, sample_matches):
         """Doit retourner la liste 'matches' du payload API."""
         with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
@@ -70,6 +142,18 @@ class TestGetMatches:
             result = get_matches("PL", 2023, config=config)
 
         assert result == sample_matches
+
+    def test_uses_default_config_when_none_is_provided(self, config):
+        with (
+            patch(
+                "src.ingestion.fetch_matches.Config", return_value=config
+            ) as mock_config,
+            patch("src.ingestion.fetch_matches.requests.get") as mock_get,
+        ):
+            mock_get.return_value = _mock_response(200, {"matches": []})
+            get_matches("PL")
+
+        mock_config.assert_called_once_with()
 
     def test_sends_auth_header(self, config):
         """Le token API doit être transmis dans X-Auth-Token."""
@@ -114,6 +198,23 @@ class TestGetMatches:
             result = get_matches("PL", 2023, config=config)
 
         assert result == []
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            [],
+            {"matches": {}},
+            {"matches": ["not-a-match"]},
+        ],
+    )
+    def test_rejects_invalid_response_schema_without_retry(self, config, payload):
+        with patch("src.ingestion.fetch_matches.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(200, payload)
+
+            with pytest.raises(ValueError, match="Réponse API invalide"):
+                get_matches("PL", 2023, config=config)
+
+        assert mock_get.call_count == 1
 
     def test_raises_immediately_on_non_400_4xx(self, config):
         """Une erreur 4xx autre que 400 doit être levée sans retry ni fallback."""
@@ -267,6 +368,52 @@ class TestGetMatches:
 class TestUploadToS3:
     """Tests de la fonction upload_to_s3."""
 
+    @pytest.mark.parametrize("data", [{"id": 1}, [{"id": 1}, "invalid"]])
+    def test_rejects_invalid_match_data_before_s3_call(self, config, data):
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="liste d'objets match"):
+                upload_to_s3(
+                    data,
+                    "test-bucket",
+                    "PL",
+                    date(2024, 3, 15),
+                    config=config,
+                )
+
+        mock_client.assert_not_called()
+
+    def test_rejects_non_string_bucket_before_s3_call(self, config):
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="bucket S3.*chaîne"):
+                upload_to_s3([], None, "PL", config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_empty_bucket_before_s3_call(self, config):
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="bucket S3"):
+                upload_to_s3([], " ", "PL", config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_non_string_aws_region_before_s3_call(self, config):
+        config = replace(config, aws_region=None)
+
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS.*chaîne"):
+                upload_to_s3([], "bucket", "PL", config=config)
+
+        mock_client.assert_not_called()
+
+    def test_rejects_empty_aws_region_before_s3_call(self, config):
+        config = replace(config, aws_region=" \n ")
+
+        with patch("src.ingestion.fetch_matches.boto3.client") as mock_client:
+            with pytest.raises(ValueError, match="région AWS"):
+                upload_to_s3([], "my-bucket", "PL", config=config)
+
+        mock_client.assert_not_called()
+
     def test_calls_put_object(self, config, sample_matches):
         """put_object doit être appelé avec le bucket et la clé construite."""
         mock_s3 = MagicMock()
@@ -279,6 +426,18 @@ class TestUploadToS3:
         call_kwargs = mock_s3.put_object.call_args[1]
         assert call_kwargs["Bucket"] == "my-bucket"
         assert call_kwargs["Key"] == "raw/PL/2024-03-15/matches.json"
+
+    def test_upload_uses_default_config_when_none_is_provided(self, config):
+        mock_s3 = MagicMock()
+        with (
+            patch(
+                "src.ingestion.fetch_matches.Config", return_value=config
+            ) as mock_config,
+            patch("src.ingestion.fetch_matches.boto3.client", return_value=mock_s3),
+        ):
+            upload_to_s3([], "my-bucket", "PL")
+
+        mock_config.assert_called_once_with()
 
     def test_returns_s3_uri(self, config, sample_matches):
         """Doit retourner une URI s3:// avec la clé construite."""
@@ -315,6 +474,7 @@ class TestUploadToS3:
 
     def test_uses_aws_region_from_config(self, config):
         """boto3.client doit utiliser la région de la config."""
+        config = replace(config, aws_region=" eu-west-1 ")
         mock_s3 = MagicMock()
         with patch(
             "src.ingestion.fetch_matches.boto3.client", return_value=mock_s3
@@ -340,6 +500,39 @@ class TestUploadToS3:
 
 class TestFetchAllCompetitions:
     """Tests de la fonction fetch_all_competitions."""
+
+    @pytest.mark.parametrize("competitions", ["PL", ("PL",), None])
+    def test_rejects_non_list_competitions(self, competitions, config):
+        """Une chaîne ne doit pas être parcourue caractère par caractère."""
+        with (
+            patch("src.ingestion.fetch_matches.get_matches") as mock_gm,
+            pytest.raises(ValueError, match="dans une liste"),
+        ):
+            fetch_all_competitions(competitions, config=config)
+
+        mock_gm.assert_not_called()
+
+    @pytest.mark.parametrize("competitions", [["PL", ""], ["PL", "  "], ["PL", 42]])
+    def test_rejects_invalid_code_before_any_request(self, competitions, config):
+        """Tous les codes sont validés avant le premier appel réseau."""
+        with (
+            patch("src.ingestion.fetch_matches.get_matches") as mock_gm,
+            pytest.raises(ValueError, match="index 1"),
+        ):
+            fetch_all_competitions(competitions, config=config)
+
+        mock_gm.assert_not_called()
+
+    def test_strips_competition_codes(self, config, sample_matches):
+        """Les espaces accidentels ne polluent pas les appels ni les clés."""
+        with patch(
+            "src.ingestion.fetch_matches.get_matches",
+            return_value=sample_matches,
+        ) as mock_gm:
+            result = fetch_all_competitions([" PL "], config=config)
+
+        mock_gm.assert_called_once_with("PL", season=None, config=config)
+        assert result == {"PL": sample_matches}
 
     def test_calls_get_matches_for_each_competition(self, config, sample_matches):
         """Doit appeler get_matches une fois par compétition."""
@@ -424,10 +617,27 @@ class TestFetchAllCompetitions:
 class TestBuildS3Key:
     """Tests de la fonction build_s3_key."""
 
+    def test_rejects_non_string_competition_code(self):
+        with pytest.raises(ValueError, match="code de compétition.*chaîne"):
+            build_s3_key(None)
+
+    def test_rejects_empty_competition_code(self):
+        with pytest.raises(ValueError, match="code de compétition"):
+            build_s3_key(" ", date(2024, 3, 15))
+
+    @pytest.mark.parametrize("competition_code", ["PL/archive", r"PL\archive"])
+    def test_rejects_competition_code_path_separators(self, competition_code):
+        with pytest.raises(ValueError, match="séparateur"):
+            build_s3_key(competition_code, date(2024, 3, 15))
+
     def test_format_with_explicit_date(self):
         """La clé doit suivre le format raw/{code}/{date}/matches.json."""
         key = build_s3_key("PL", date(2024, 3, 15))
         assert key == "raw/PL/2024-03-15/matches.json"
+
+    def test_rejects_invalid_run_date(self):
+        with pytest.raises(ValueError, match="date de collecte S3"):
+            build_s3_key("PL", "2024-03-15")
 
     def test_uses_today_when_no_date(self):
         """Sans date explicite, la date du jour doit être utilisée."""

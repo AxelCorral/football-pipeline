@@ -101,7 +101,7 @@ football-pipeline/
 │   ├── ingestion/
 │   │   └── fetch_matches.py        # Fetch API + retry + upload S3 JSON
 │   ├── extract/
-│   │   └── football_api.py         # Client API football-data.org (stub)
+│   │   └── football_api.py         # Client API football-data.org
 │   ├── transform/
 │   │   ├── process_matches.py      # load_raw_from_s3 · transform · save_as_parquet
 │   │   └── glue_transform.py       # GlueTransformer (pandas Glue-like)

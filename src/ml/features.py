@@ -18,6 +18,15 @@ FEATURE_COLS = [
     "away_conceded_avg",
     "home_advantage",
 ]
+REQUIRED_COLUMNS = {
+    "date",
+    "status",
+    "result",
+    "home_team",
+    "away_team",
+    "home_goals",
+    "away_goals",
+}
 
 
 def compute_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -32,12 +41,25 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame filtré sur FINISHED, trié par date, avec FEATURE_COLS ajoutées.
         Les premiers matchs d'une équipe peuvent avoir des NaN (historique vide).
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Les données de matchs doivent être un DataFrame pandas")
+
+    missing_columns = REQUIRED_COLUMNS.difference(df.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"Colonnes requises absentes : {missing}")
+
     finished = df[df["status"] == "FINISHED"].sort_values("date").copy()
 
     if finished.empty:
         for col in FEATURE_COLS:
             finished[col] = pd.Series(dtype=float)
         return finished
+
+    invalid_results = finished.loc[~finished["result"].isin({"H", "D", "A"}), "result"]
+    if not invalid_results.empty:
+        labels = ", ".join(sorted({str(value) for value in invalid_results}))
+        raise ValueError(f"Labels de résultat non supportés : {labels}")
 
     def _roll(s: pd.Series) -> pd.Series:
         return s.shift(1).rolling(WINDOW, min_periods=1).mean()
