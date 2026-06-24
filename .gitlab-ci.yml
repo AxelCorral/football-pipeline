@@ -31,12 +31,16 @@ variables:
 lint:flake8:
   extends: .python-base
   stage: lint
+  before_script:
+    - pip install -r requirements.txt -r requirements-dev.txt
   script:
     - flake8 src/ tests/
 
 lint:black:
   extends: .python-base
   stage: lint
+  before_script:
+    - pip install -r requirements.txt -r requirements-dev.txt
   script:
     - black --check src/ tests/
 
@@ -48,7 +52,7 @@ test:unit:
   extends: .python-base
   stage: test
   before_script:
-    - pip install -r requirements.txt pytest-cov
+    - pip install -r requirements.txt -r requirements-dev.txt
   script:
     - |
       pytest tests/ -v --tb=short \
@@ -74,8 +78,6 @@ test:unit:
 model:train:
   extends: .python-base
   stage: model
-  before_script:
-    - pip install -r requirements.txt scikit-learn==1.7.2 joblib==1.5.3
   script:
     - python -m src.ml.train
   rules:
