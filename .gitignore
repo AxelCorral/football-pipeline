@@ -24,8 +24,8 @@ graphify-out/
 *.swp
 *.swo
 
-# ML models
-models/*.joblib
+# ML models (modèles pré-entraînés versionnés pour le dashboard)
+!models/*.joblib
 
 # OS
 .DS_Store
