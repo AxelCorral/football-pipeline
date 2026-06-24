@@ -58,7 +58,9 @@ def _log_dry_run(config: Config, competitions: list[str], season: int | None) ->
     for code in competitions:
         name = COMPETITION_NAMES.get(code, code)
         raw_key = build_s3_key(code, run_date)
-        curated_key = build_curated_key(code, season if season is not None else "<saison>")
+        curated_key = build_curated_key(
+            code, season if season is not None else "<saison>"
+        )
         logger.info(
             "[DRY RUN] %s (%s) : fetch matches -> upload s3://%s/%s "
             "-> transform -> save s3://%s/%s",
