@@ -1,7 +1,7 @@
 """Streamlit dashboard — Football Pipeline (5 grandes ligues européennes)."""
 
+import json
 import sys
-import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -12,9 +12,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from src.ml.evaluate import baseline_accuracy
 from src.ml.features import FEATURE_COLS, compute_features
-from src.ml.train import LABEL_MAP, train_model
+from src.ml.inference import load_model, predict_proba
 
 CACHE_PATH = Path("data/cache/matches_all_2025.parquet")
+METRICS_PATH = Path("models/metrics.json")
 
 COMPETITION_NAMES: dict[str, str] = {
     "PL": "Premier League",
@@ -549,27 +550,22 @@ def load_data() -> pd.DataFrame:
     return pd.read_parquet(CACHE_PATH)
 
 
+def _league_key(league: str) -> str:
+    return "all" if league in ("All", "Toutes") else league
+
+
 @st.cache_resource
-def _train(_cache_mtime: float, league_filter: str):
-    """Entraîne le modèle une seule fois par (fichier, compétition)."""
-    df = load_data()
-    if df.empty:
-        return None, None, None, None
-    if league_filter not in ("Toutes", "All") and "league_code" in df.columns:
-        df = df[df["league_code"] == league_filter]
-    df_feat = compute_features(df)
-    baseline = baseline_accuracy(df)
-    _tmp = Path(tempfile.mkdtemp())
-    try:
-        model, acc, _cm = train_model(df_feat, models_dir=_tmp)
-    except ValueError:
-        return None, None, baseline, df_feat
-    return model, acc, baseline, df_feat
+def get_model(league: str):
+    """Charge le modèle pré-entraîné de la ligue (mis en cache par session)."""
+    return load_model(_league_key(league))
 
 
-def get_model(league_filter: str = "Toutes"):
-    mtime = CACHE_PATH.stat().st_mtime if CACHE_PATH.exists() else 0.0
-    return _train(mtime, league_filter)
+def get_league_metrics(league: str) -> dict | None:
+    """Lit accuracy/baseline/gain mesurés hors-ligne pour la ligue donnée."""
+    if not METRICS_PATH.exists():
+        return None
+    metrics = json.loads(METRICS_PATH.read_text())
+    return metrics.get(_league_key(league))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1048,12 +1044,23 @@ elif page == "Prediction":
         unsafe_allow_html=True,
     )
 
-    with st.spinner("Training model…"):
-        model, acc, baseline, df_feat = get_model(selected_league)
+    model = get_model(selected_league)
 
     if model is None:
-        st.error("Not enough data to train the model for this selection.")
+        st.warning(
+            f"Modèle non disponible pour {competition_label} — lancez "
+            "`python scripts/train_all_models.py` puis redéployez l'application."
+        )
         st.stop()
+
+    df_feat = compute_features(df)
+    metrics = get_league_metrics(selected_league)
+    if metrics is not None:
+        baseline = metrics["baseline"]
+        acc = metrics["accuracy"]
+    else:
+        baseline = baseline_accuracy(df)
+        acc = None
 
     teams = sorted(finished["home_team"].dropna().unique().tolist())
 
@@ -1090,7 +1097,7 @@ elif page == "Prediction":
                 "Try a different combination."
             )
         else:
-            proba = model.predict_proba(X_pred[FEATURE_COLS].values.astype(float))[0]
+            proba = predict_proba(model, X_pred)
             # LABEL_MAP = {"H": 0, "D": 1, "A": 2}
             max_idx = int(proba.argmax())
 
@@ -1108,16 +1115,20 @@ elif page == "Prediction":
                 unsafe_allow_html=True,
             )
 
-            delta = acc - baseline
-            delta_cls = "pos" if delta >= 0 else "neg"
-            delta_str = f"{delta:+.1%}"
+            acc_value = f"{acc:.1%}" if acc is not None else "N/A"
+            if acc is not None:
+                delta = acc - baseline
+                delta_cls = "pos" if delta >= 0 else "neg"
+                delta_html = f'<div class="acc-delta {delta_cls}">{delta:+.1%} vs baseline</div>'
+            else:
+                delta_html = ""
             st.markdown(
                 '<div class="acc-row">'
-                f'<div><div class="acc-value">{acc:.1%}</div>'
+                f'<div><div class="acc-value">{acc_value}</div>'
                 f'<div class="acc-lbl">Model accuracy</div></div>'
                 f'<div><div class="acc-value">{baseline:.1%}</div>'
                 f'<div class="acc-lbl">Naive baseline</div>'
-                f'<div class="acc-delta {delta_cls}">{delta_str} vs baseline</div>'
+                f"{delta_html}"
                 f"</div></div>",
                 unsafe_allow_html=True,
             )
