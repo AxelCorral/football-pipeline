@@ -25,8 +25,11 @@
 3. **New app** → sélectionner le repo et renseigner :
    - **Main file path** : `app.py`
    - **Python version** : 3.12
-4. Dans **Advanced settings → Requirements file** : saisir `requirements_app.txt`
-5. Cliquer **Deploy**
+4. Cliquer **Deploy**
+
+> Streamlit Cloud installe automatiquement le `requirements.txt` **à la racine**
+> du repo ; il n'existe pas de réglage pour pointer vers un autre fichier.
+> C'est pourquoi `requirements.txt` contient aussi `streamlit` et `plotly`.
 
 > L'app fonctionnera entièrement **sans credentials AWS** grâce au cache Parquet
 > committé dans le repo.
