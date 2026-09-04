@@ -1,5 +1,9 @@
-# Dépendances directes du pipeline ETL (src/, scripts/) — voir requirements-dev.txt
-# pour les outils de lint/test et requirements_app.txt pour le dashboard Streamlit.
+# Fichier lu par Streamlit Community Cloud (requirements.txt à la racine) :
+# il doit donc couvrir à la fois le pipeline ETL (src/, scripts/) et le
+# dashboard app.py. Voir requirements-dev.txt pour les outils de lint/test et
+# requirements_app.txt pour une installation « dashboard seul ».
+
+# ── Pipeline ETL ──────────────────────────────────────────────────────────────
 boto3==1.43.19
 joblib==1.5.3
 numpy==2.2.6
@@ -8,3 +12,7 @@ pyarrow==24.0.0
 python-dotenv==1.2.2
 requests==2.34.2
 scikit-learn==1.7.2
+
+# ── Dashboard Streamlit (app.py) ──────────────────────────────────────────────
+plotly==6.8.0
+streamlit==1.58.0
