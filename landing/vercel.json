@@ -2,7 +2,7 @@
   "cleanUrls": true,
   "headers": [
     {
-      "source": "/og-site.png",
+      "source": "/og-site-v2.png",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=31536000, immutable" }
       ]
