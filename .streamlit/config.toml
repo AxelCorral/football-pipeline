@@ -1,10 +1,45 @@
+# Thème natif — Streamlit 1.58.
+#
+# Tout ce qui peut être déclaré ici l'est ici, et pas en CSS injecté : un
+# override en `!important` sur un sélecteur `data-testid` casse à la prochaine
+# montée de version de Streamlit, une clé de thème non. Les valeurs doivent
+# rester identiques à celles de `src/ui/theme.py`, qui reste la source de
+# vérité pour tout ce que le thème natif ne couvre pas (voir docs/design.md).
+
 [theme]
 base = "dark"
+
+# Typographie — les fichiers de police sont chargés par l'@import de theme.py.
+font = "DM Sans"
+headingFont = "DM Serif Display"
+codeFont = "DM Mono"
+baseFontSize = 15
+
+# Structure
 backgroundColor = "#111111"
-secondaryBackgroundColor = "#1A1A1A"
-primaryColor = "#C8A96E"
+secondaryBackgroundColor = "#141414"
 textColor = "#F5F5F5"
-font = "sans serif"
+borderColor = "#2E2E2E"
+dataframeBorderColor = "#2E2E2E"
+dataframeHeaderBackgroundColor = "#0D0D0D"
+codeBackgroundColor = "#0D0D0D"
+codeTextColor = "#C8A96E"
+
+# Marque
+primaryColor = "#C8A96E"
+linkColor = "#C8A96E"
+linkUnderline = true
+
+# Arêtes vives : la charte est éditoriale, aucun angle arrondi.
+baseRadius = "none"
+buttonRadius = "none"
+showWidgetBorder = false
+showSidebarBorder = true
+
+# Palette de séries. L'or d'abord — une seule série accentuée par figure —
+# puis les neutres. Les couleurs de mesure (better/worse) n'y figurent pas :
+# elles sont sémantiques et se choisissent au cas par cas, jamais par rotation.
+chartCategoricalColors = ["#C8A96E", "#888888", "#555555", "#F5F5F5", "#2E2E2E"]
 
 [server]
 headless = true
