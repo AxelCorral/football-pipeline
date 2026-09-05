@@ -70,6 +70,15 @@ SIZE: dict[str, str] = {
 # Une seule graduation d'espacement, en px.
 SPACE = (4, 8, 12, 16, 20, 28, 40, 56)
 
+# Les trois familles, chargées en une requête.
+FONTS_URL = (
+    "https://fonts.googleapis.com/css2"
+    "?family=DM+Serif+Display:ital@0;1"
+    "&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400"
+    "&family=DM+Mono:wght@300;400;500"
+    "&display=swap"
+)
+
 
 def _t(name: str) -> str:
     return COLOR[name]
@@ -82,7 +91,7 @@ def _t(name: str) -> str:
 _CSS_TEMPLATE = Template(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@300;400;500&display=swap');
+@import url('$fonts_url');
 
 /* ── Reset & base ── */
 *, *::before, *::after {
@@ -633,6 +642,7 @@ hr {
 def css() -> str:
     """La feuille de style complète, construite depuis les tokens."""
     mapping = {
+        "fonts_url": FONTS_URL,
         **COLOR,
         "sans": FONT["sans"],
         "mono": FONT["mono"],
