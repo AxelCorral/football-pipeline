@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.ml.evaluate import baseline_accuracy
 from src.ml.features import FEATURE_COLS, compute_features
 from src.ml.inference import load_model, predict_proba
+from src.ui import theme
 
 CACHE_PATH = Path("data/cache/matches_all_2025.parquet")
 METRICS_PATH = Path("models/metrics.json")
@@ -143,400 +144,12 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Global CSS — Editorial Sports
+# Design system — tout vient de src/ui/theme.py, rien n'est écrit en dur ici
 # ─────────────────────────────────────────────────────────────────────────────
 
-_CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@300;400;500&display=swap');
+st.markdown(theme.css(), unsafe_allow_html=True)
 
-/* ── Reset & base ── */
-*, *::before, *::after {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    box-sizing: border-box;
-}
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2E2E2E; }
-
-/* ── App background ── */
-.stApp,
-[data-testid="stAppViewContainer"] > .main,
-section.main > div { background: #111111 !important; }
-.block-container { padding-top: 2.5rem !important; }
-
-/* ── Sidebar ── */
-[data-testid="stSidebar"],
-[data-testid="stSidebar"] > div:first-child {
-    background: #0D0D0D !important;
-    border-right: 1px solid #2E2E2E !important;
-}
-
-/* ── Sidebar radio — hide the dot, style labels ── */
-[data-testid="stSidebar"] [data-baseweb="radio-group"] { gap: 0 !important; }
-[data-testid="stSidebar"] [data-baseweb="radio"] {
-    padding: 8px 0 8px 16px !important;
-    margin: 0 !important;
-    border-left: 2px solid transparent !important;
-    align-items: center !important;
-}
-[data-testid="stSidebar"] [data-baseweb="radio"]:has(input:checked) {
-    border-left: 2px solid #C8A96E !important;
-}
-[data-testid="stSidebar"] [data-baseweb="radio"] [data-testid="stMarkdownContainer"] p,
-[data-testid="stSidebar"] [data-baseweb="radio"] label p,
-[data-testid="stSidebar"] [data-baseweb="radio"] label span {
-    font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.85rem !important;
-    color: #555555 !important;
-}
-[data-testid="stSidebar"] [data-baseweb="radio"]:has(input:checked) label p,
-[data-testid="stSidebar"] [data-baseweb="radio"]:has(input:checked) label span {
-    color: #F5F5F5 !important;
-}
-/* Hide the radio circle */
-[data-testid="stSidebar"] [data-baseweb="radio"] [class*="circle"],
-[data-testid="stSidebar"] [data-baseweb="radio"] > div:first-child { display: none !important; }
-
-/* ── Headings ── */
-h1 {
-    font-family: 'DM Serif Display', serif !important;
-    font-size: 2.2rem !important;
-    font-weight: 400 !important;
-    color: #F5F5F5 !important;
-    line-height: 1.15 !important;
-    letter-spacing: -0.01em !important;
-    margin-bottom: 0 !important;
-}
-h2, h3 {
-    font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.7rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.15em !important;
-    color: #888888 !important;
-    margin: 28px 0 16px !important;
-}
-
-/* ── Override Streamlit metrics ── */
-[data-testid="stMetricValue"] {
-    font-family: 'DM Mono', monospace !important;
-    font-size: 2.2rem !important;
-    font-weight: 400 !important;
-    color: #C8A96E !important;
-    line-height: 1 !important;
-}
-[data-testid="stMetricLabel"] {
-    font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.65rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.14em !important;
-    color: #888888 !important;
-}
-
-/* ── Primary button (Predict) ── */
-[data-testid="baseButton-primary"] {
-    background: #F5F5F5 !important;
-    color: #111111 !important;
-    font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.82rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.12em !important;
-    border-radius: 0 !important;
-    border: none !important;
-    height: 44px !important;
-    transition: background 0.12s;
-}
-[data-testid="baseButton-primary"]:hover { background: #E2E2E2 !important; }
-
-/* ── Dividers ── */
-hr {
-    border: none !important;
-    border-top: 1px solid #2E2E2E !important;
-    margin: 28px 0 !important;
-}
-
-/* ── Section label ── */
-.sl {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: #888888;
-    margin: 28px 0 16px;
-    display: block;
-    border-top: 1px solid #2E2E2E;
-    padding-top: 20px;
-}
-
-/* ── KPI row ── */
-.kpi-row {
-    display: flex;
-    align-items: center;
-    border-top: 1px solid #2E2E2E;
-    border-bottom: 1px solid #2E2E2E;
-    padding: 28px 0;
-    margin: 24px 0 32px;
-}
-.kpi-item { flex: 1; padding: 0 28px; text-align: center; }
-.kpi-item:first-child { padding-left: 4px; }
-.kpi-divider { width: 1px; height: 48px; background: #2E2E2E; flex-shrink: 0; }
-.kpi-value {
-    font-family: 'DM Mono', monospace;
-    font-size: 2.8rem;
-    color: #C8A96E;
-    line-height: 1;
-    letter-spacing: -0.02em;
-}
-.kpi-label {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: #888888;
-    margin-top: 8px;
-}
-
-/* ── League summary ── */
-.league-table { width: 100%; border-collapse: collapse; }
-.league-table thead th {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #555555;
-    padding: 0 0 10px;
-    border-bottom: 1px solid #2E2E2E;
-    text-align: right;
-}
-.league-table thead th:first-child { text-align: left; }
-.league-table tbody tr:nth-child(even) td { background: #141414; }
-.league-table tbody td {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.88rem;
-    color: #F5F5F5;
-    padding: 10px 0;
-    text-align: right;
-}
-.league-table tbody td:first-child { text-align: left; }
-.league-table .mono { font-family: 'DM Mono', monospace; font-size: 0.82rem; color: #888888; }
-
-/* ── Standings table ── */
-.standings-wrap { overflow-y: auto; max-height: 680px; }
-.standings-table { width: 100%; border-collapse: collapse; }
-.standings-table thead tr { border-bottom: 1px solid #2E2E2E; }
-.standings-table th {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #555555;
-    padding: 0 16px 10px 0;
-    text-align: right;
-    white-space: nowrap;
-}
-.standings-table th.l { text-align: left; padding-right: 0; }
-.standings-table td {
-    padding: 8px 16px 8px 0;
-    color: #F5F5F5;
-    text-align: right;
-    font-size: 0.88rem;
-    border-bottom: 1px solid #1A1A1A;
-}
-.standings-table td.l { text-align: left; padding-right: 0; padding-left: 8px; }
-.standings-table td.rank-cell {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.78rem;
-    color: #555555;
-    text-align: left;
-    padding-right: 0;
-    width: 28px;
-}
-.standings-table td.rank-1 {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.78rem;
-    color: #C8A96E;
-    text-align: left;
-    padding-right: 0;
-    width: 28px;
-}
-.standings-table td.pts {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.88rem;
-    color: #F5F5F5;
-}
-.standings-table td.num {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.82rem;
-    color: #888888;
-}
-.standings-table td.logo { width: 36px; }
-.standings-table tbody tr:hover td { background: #161616; }
-.standings-table tbody tr:last-child td { border-bottom: none; }
-.standings-table tr.sep td {
-    padding: 0;
-    border: none;
-    height: 0;
-}
-.standings-table tr.sep td > div {
-    border-top: 1px dashed #2E2E2E;
-    position: relative;
-    height: 1px;
-    margin: 6px 0;
-}
-.standings-table tr.sep .sep-label {
-    position: absolute;
-    left: 50%;
-    top: -8px;
-    transform: translateX(-50%);
-    background: #111111;
-    padding: 0 8px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.6rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #555555;
-    white-space: nowrap;
-}
-
-/* ── Prediction ── */
-.pred-label {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: #888888;
-    display: block;
-    margin-bottom: 6px;
-}
-.pred-vs {
-    font-family: 'DM Serif Display', serif;
-    font-style: italic;
-    font-size: 1.5rem;
-    color: #555555;
-    text-align: center;
-    padding-top: 24px;
-    display: block;
-    user-select: none;
-}
-.pred-crest { text-align: center; margin-top: 10px; }
-.pred-crest img {
-    width: 54px;
-    height: 54px;
-    object-fit: contain;
-    opacity: 0.85;
-}
-
-/* ── Prob bars ── */
-.prob-section { margin: 24px 0; }
-.prob-row { margin: 16px 0; }
-.prob-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 7px;
-}
-.prob-row-label {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #888888;
-}
-.prob-row-label.predicted { color: #C8A96E; }
-.prob-pct {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.88rem;
-    color: #F5F5F5;
-}
-.prob-track { background: #1A1A1A; height: 4px; }
-.prob-fill { height: 4px; transition: width 0.4s ease; }
-
-/* ── Accuracy section ── */
-.acc-row {
-    display: flex;
-    gap: 48px;
-    margin: 20px 0;
-    padding-top: 20px;
-    border-top: 1px solid #2E2E2E;
-}
-.acc-value {
-    font-family: 'DM Mono', monospace;
-    font-size: 2.4rem;
-    color: #F5F5F5;
-    line-height: 1;
-    letter-spacing: -0.02em;
-}
-.acc-lbl {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #888888;
-    margin-top: 6px;
-}
-.acc-delta {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.78rem;
-    margin-top: 5px;
-}
-.pos { color: #4CAF7D; }
-.neg { color: #E05C5C; }
-
-/* ── About ── */
-.about-body {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.9rem;
-    color: #888888;
-    line-height: 1.7;
-    max-width: 680px;
-}
-.about-body strong { color: #F5F5F5; font-weight: 500; }
-.about-link {
-    color: #C8A96E;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    text-decoration-color: rgba(200,169,110,0.4);
-}
-.about-link:hover { text-decoration-color: #C8A96E; }
-.stack-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 48px;
-    margin: 16px 0;
-}
-.stack-row-item { padding: 8px 0; border-bottom: 1px solid #1A1A1A; }
-.stack-name { font-family: 'DM Sans', sans-serif; font-size: 0.88rem; color: #F5F5F5; }
-.stack-desc { font-family: 'DM Sans', sans-serif; font-size: 0.82rem; color: #555555; margin-top: 1px; }
-</style>
-"""
-
-st.markdown(_CSS, unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Plotly base layout
-# ─────────────────────────────────────────────────────────────────────────────
-
-_PLOTLY = dict(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#888888", family="DM Sans, system-ui", size=11),
-    xaxis=dict(gridcolor="#1A1A1A", linecolor="#2E2E2E", tickcolor="#555555"),
-    yaxis=dict(gridcolor="#1A1A1A", linecolor="#2E2E2E", tickcolor="#555555"),
-    margin=dict(l=0, r=0, t=24, b=0),
-    showlegend=False,
-)
+C = theme.COLOR
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data & model
@@ -560,12 +173,17 @@ def get_model(league: str):
     return load_model(_league_key(league))
 
 
+@st.cache_data
+def load_metrics() -> dict:
+    """Toutes les métriques mesurées hors-ligne, par ligue."""
+    if not METRICS_PATH.exists():
+        return {}
+    return json.loads(METRICS_PATH.read_text())
+
+
 def get_league_metrics(league: str) -> dict | None:
     """Lit accuracy/baseline/gain mesurés hors-ligne pour la ligue donnée."""
-    if not METRICS_PATH.exists():
-        return None
-    metrics = json.loads(METRICS_PATH.read_text())
-    return metrics.get(_league_key(league))
+    return load_metrics().get(_league_key(league))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -649,36 +267,30 @@ def build_prediction_row(
     )
 
 
-def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
-    n = len(standings)
-    sep_after: dict[int, str] = {}
-    if with_zones and n >= 2:
-        sep_after[1] = "Champion"
+def _standings_html(standings: pd.DataFrame, per90: bool = False) -> str:
+    """Le classement, dans la typographie du dashboard.
 
+    Streamlit rend `st.dataframe` avec sa propre grille, qui ignore le thème :
+    police, couleurs et bordures lui échappent. Ce tableau est donc écrit à la
+    main pour rester dans la charte, au prix de perdre le tri interactif —
+    l'ordre au classement est de toute façon le seul qui compte ici.
+    """
+    cols = (
+        ["GF/90", "GA/90", "+/−/90"] if per90 else ["GF", "GA", "+/−"]
+    )
     thead = (
         "<thead><tr>"
         '<th class="l" style="padding-left:0">#</th>'
         "<th></th>"
         '<th class="l">Team</th>'
         "<th>M</th><th>W</th><th>D</th><th>L</th>"
-        "<th>GF</th><th>GA</th><th>+/−</th><th>Pts</th>"
+        f"<th>{cols[0]}</th><th>{cols[1]}</th><th>{cols[2]}</th><th>Pts</th>"
         "</tr></thead>"
     )
 
     rows_html: list[str] = []
     for i, row in standings.iterrows():
         rank = i + 1
-        if rank > 1 and (rank - 1) in sep_after:
-            rows_html.append(
-                '<tr class="sep"><td colspan="11">'
-                '<div style="border-top:1px dashed #2E2E2E;position:relative;'
-                'height:1px;margin:6px 0">'
-                '<span style="position:absolute;right:0;top:-9px;background:#111111;'
-                'padding:0 0 0 8px;font-family:\'DM Sans\',sans-serif;font-size:0.65rem;'
-                'font-weight:600;letter-spacing:0.1em;text-transform:uppercase;'
-                'color:#C8A96E;white-space:nowrap">Champion</span></div>'
-                "</td></tr>"
-            )
         rank_cls = "rank-1" if rank == 1 else "rank-cell"
         crest = TEAM_CRESTS.get(row["Équipe"], "")
         img = (
@@ -687,8 +299,16 @@ def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
             if crest
             else ""
         )
-        diff = row["Diff"]
-        diff_str = f"+{diff}" if diff > 0 else str(diff)
+        played = int(row["J"]) or 1
+        if per90:
+            gf = f'{row["BP"] / played:.2f}'
+            ga = f'{row["BC"] / played:.2f}'
+            d = row["Diff"] / played
+            diff_str = f"{d:+.2f}"
+        else:
+            gf = f'{int(row["BP"])}'
+            ga = f'{int(row["BC"])}'
+            diff_str = f'{int(row["Diff"]):+d}'
         rows_html.append(
             f'<tr>'
             f'<td class="{rank_cls}">{rank}</td>'
@@ -698,8 +318,8 @@ def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
             f'<td class="num">{row["G"]}</td>'
             f'<td class="num">{row["N"]}</td>'
             f'<td class="num">{row["P"]}</td>'
-            f'<td class="num">{row["BP"]}</td>'
-            f'<td class="num">{row["BC"]}</td>'
+            f'<td class="num">{gf}</td>'
+            f'<td class="num">{ga}</td>'
             f'<td class="num">{diff_str}</td>'
             f'<td class="pts">{row["Pts"]}</td>'
             f"</tr>"
@@ -713,14 +333,68 @@ def _standings_html(standings: pd.DataFrame, with_zones: bool) -> str:
     )
 
 
+def _scorecard_html(metrics: dict, highlight: str | None = None) -> str:
+    """Performance du modèle face à la baseline, pour chaque ligue.
+
+    Les ligues où le modèle perd sont affichées dans le même traitement que
+    celles où il gagne — c'est le point de la page, pas une note de bas de
+    page. Le tri est décroissant, donc l'écart négatif ferme le tableau au
+    lieu d'être noyé au milieu.
+    """
+    rows = [
+        (code, m)
+        for code, m in metrics.items()
+        if code in COMPETITION_NAMES and isinstance(m, dict) and "gain" in m
+    ]
+    if not rows:
+        return ""
+    rows.sort(key=lambda kv: kv[1]["gain"], reverse=True)
+    max_abs = max(abs(m["gain"]) for _, m in rows) or 1.0
+    scale = 76.0 / max_abs
+
+    body = ""
+    for code, m in rows:
+        gain = float(m["gain"])
+        cls = theme.measure_class(gain, tolerance=0.0005)
+        width = max(abs(gain) * scale, 1.5)
+        left = 80.0 if gain >= 0 else 80.0 - width
+        bar = (
+            f'<span class="dbar">'
+            f'<i style="left:{left:.1f}px;width:{width:.1f}px;'
+            f'background:{theme.COLOR[cls]}"></i></span>'
+        )
+        name = COMPETITION_NAMES.get(code, code)
+        if highlight and code == highlight:
+            name = f'<span style="color:{C["accent"]}">{name}</span>'
+        body += (
+            "<tr>"
+            f"<td>{name}</td>"
+            f'<td class="n">{int(m.get("n_rows", 0)):,}</td>'
+            f'<td class="mono">{m["baseline"]:.1%}</td>'
+            f'<td class="mono">{m["accuracy"]:.1%}</td>'
+            f'<td class="delta {cls}">{gain * 100:+.1f} pts</td>'
+            f'<td class="dbar-cell">{bar}</td>'
+            "</tr>"
+        )
+
+    return (
+        '<table class="perf-table"><thead><tr>'
+        "<th>Competition</th><th>Test rows</th><th>Naive baseline</th>"
+        "<th>Model accuracy</th><th>Gain</th><th></th>"
+        "</tr></thead>"
+        f"<tbody>{body}</tbody></table>"
+    )
+
+
 def _prob_bar(label: str, prob: float, color: str, predicted: bool) -> str:
     pct = prob * 100
     lbl_cls = "prob-row-label predicted" if predicted else "prob-row-label"
+    pct_cls = "prob-pct predicted" if predicted else "prob-pct"
     return (
         f'<div class="prob-row">'
         f'<div class="prob-header">'
         f'<span class="{lbl_cls}">{label}</span>'
-        f'<span class="prob-pct">{pct:.1f}%</span>'
+        f'<span class="{pct_cls}">{pct:.1f}%</span>'
         f"</div>"
         f'<div class="prob-track">'
         f'<div class="prob-fill" style="width:{pct:.1f}%;background:{color}"></div>'
@@ -733,16 +407,9 @@ def _prob_bar(label: str, prob: float, color: str, predicted: bool) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 st.sidebar.markdown(
-    '<p style="font-family:\'DM Serif Display\',serif;font-size:1.15rem;'
-    'font-weight:400;color:#F5F5F5;margin:0 0 2px;line-height:1.2">'
-    "Football Pipeline</p>"
-    '<p style="font-family:\'DM Sans\',sans-serif;font-size:0.65rem;'
-    'font-weight:600;text-transform:uppercase;letter-spacing:0.14em;'
-    'color:#555555;margin:0 0 16px">2025 / 26 Season</p>',
-    unsafe_allow_html=True,
-)
-st.sidebar.markdown(
-    '<div style="border-top:1px solid #2E2E2E;margin-bottom:12px"></div>',
+    '<p class="sb-title">Football Pipeline</p>'
+    '<p class="sb-sub">2025 / 26 Season</p>'
+    '<div class="sb-rule" style="margin-bottom:12px"></div>',
     unsafe_allow_html=True,
 )
 
@@ -755,9 +422,17 @@ page = st.sidebar.radio(
 df = load_data()
 
 if df.empty:
-    st.error(
-        "No data found at `data/cache/matches_all_2025.parquet`. "
-        "Run `python scripts/export_cache.py` to generate the local cache."
+    st.markdown(
+        theme.state_block(
+            "No local cache to read",
+            "This dashboard reads a pre-built Parquet cache and needs no AWS "
+            "credentials at runtime — but the file has to exist. Expected at "
+            "<code>data/cache/matches_all_2025.parquet</code>. Generate it with "
+            "<code>python scripts/export_cache.py</code>, which is the only step "
+            "that does need AWS access.",
+            stop=True,
+        ),
+        unsafe_allow_html=True,
     )
     st.stop()
 
@@ -765,10 +440,8 @@ selected_league = "All"
 if "league_code" in df.columns:
     codes = sorted(df["league_code"].dropna().unique().tolist())
     st.sidebar.markdown(
-        '<div style="border-top:1px solid #2E2E2E;margin:12px 0 10px"></div>'
-        '<p style="font-family:\'DM Sans\',sans-serif;font-size:0.62rem;'
-        'font-weight:600;text-transform:uppercase;letter-spacing:0.14em;'
-        'color:#555555;margin-bottom:6px">Competition</p>',
+        '<div class="sb-rule" style="margin:12px 0 10px"></div>'
+        '<p class="sb-label">Competition</p>',
         unsafe_allow_html=True,
     )
     if page == "Prediction":
@@ -799,9 +472,8 @@ _total_m = int((_full["status"] == "FINISHED").sum())
 _total_l = int(_full["league_code"].nunique()) if "league_code" in _full.columns else 5
 
 st.sidebar.markdown(
-    '<div style="border-top:1px solid #2E2E2E;margin:16px 0 10px"></div>'
-    f'<p style="font-family:\'DM Sans\',sans-serif;font-size:0.68rem;'
-    f'color:#555555;margin:0">{_total_m:,} matches · {_total_l} leagues</p>',
+    '<div class="sb-rule" style="margin:16px 0 10px"></div>'
+    f'<p class="sb-meta">{_total_m:,} matches · {_total_l} leagues</p>',
     unsafe_allow_html=True,
 )
 
@@ -848,6 +520,24 @@ if page == "Overview":
         unsafe_allow_html=True,
     )
 
+    scorecard = _scorecard_html(
+        load_metrics(),
+        highlight=selected_league if selected_league != "All" else None,
+    )
+    if scorecard:
+        st.markdown(
+            '<span class="sl">Model vs naive baseline'
+            '<span class="sl-note">every league, including where the model '
+            'loses</span></span>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(scorecard, unsafe_allow_html=True)
+        st.caption(
+            "Accuracy measured on a held-out temporal split (80/20, no shuffle). "
+            "The naive baseline always predicts the majority class of the "
+            "training period. A model that cannot beat it is worth reporting too."
+        )
+
     st.markdown('<span class="sl">Goals per matchweek</span>', unsafe_allow_html=True)
 
     iso = finished["date"].dt.isocalendar()
@@ -871,7 +561,7 @@ if page == "Overview":
             x=weekly["label"],
             y=weekly["avg_goals"],
             mode="lines",
-            line=dict(color="rgba(245,245,245,0.8)", width=1.5),
+            line=dict(color=C["ink"], width=1.5),
             hovertemplate="<b>%{y:.2f}</b> goals — %{customdata} matches<extra></extra>",
             customdata=weekly["n_matches"],
         )
@@ -885,19 +575,33 @@ if page == "Overview":
             text=f'{peak["avg_goals"]:.1f}',
             showarrow=True,
             arrowhead=0,
-            arrowcolor="#2E2E2E",
+            arrowcolor=C["line"],
             arrowwidth=1,
-            font=dict(family="DM Mono, monospace", size=10, color="#888888"),
+            font=dict(family=theme.FONT_PLOTLY["mono"], size=10, color=C["ink_2"]),
             ax=0,
             ay=-28,
             bgcolor="rgba(0,0,0,0)",
         )
     fig.update_layout(
-        **_PLOTLY,
-        height=240,
-        xaxis_tickangle=-45,
-        xaxis_title=None,
-        yaxis_title=None,
+        **theme.plotly_layout(
+            height=260,
+            xaxis=dict(
+                gridcolor="rgba(0,0,0,0)",
+                linecolor=C["line"],
+                tickcolor=C["ink_3"],
+                zeroline=False,
+                nticks=9,
+                tickangle=0,
+                title=None,
+            ),
+            yaxis=dict(
+                gridcolor=C["line_2"],
+                linecolor="rgba(0,0,0,0)",
+                tickcolor=C["ink_3"],
+                zeroline=False,
+                title=None,
+            ),
+        )
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -964,70 +668,47 @@ elif page == "Standings":
 
     st.markdown('<span class="sl">Standings</span>', unsafe_allow_html=True)
 
-    disp = standings.copy()
-    disp.insert(0, "Rank", range(1, len(disp) + 1))
-    disp["Crest"] = disp["Équipe"].map(TEAM_CRESTS)
-
-    if stat_mode == "Per 90 min":
-        played = disp["J"].where(disp["J"] > 0).astype(float)
-        disp["GF/90"] = (disp["BP"] / played).round(2)
-        disp["GA/90"] = (disp["BC"] / played).round(2)
-        disp["+/-/90"] = (disp["Diff"] / played).round(2)
-        display_cols = ["Rank", "Crest", "Équipe", "J", "G", "N", "P", "GF/90", "GA/90", "+/-/90", "Pts"]
-        col_cfg = {
-            "Rank": st.column_config.NumberColumn("#", width="small"),
-            "Crest": st.column_config.ImageColumn("", width="small"),
-            "Équipe": st.column_config.TextColumn("Team"),
-            "J": st.column_config.NumberColumn("M", width="small"),
-            "G": st.column_config.NumberColumn("W", width="small"),
-            "N": st.column_config.NumberColumn("D", width="small"),
-            "P": st.column_config.NumberColumn("L", width="small"),
-            "GF/90": st.column_config.NumberColumn("GF/90", format="%.2f", width="small"),
-            "GA/90": st.column_config.NumberColumn("GA/90", format="%.2f", width="small"),
-            "+/-/90": st.column_config.NumberColumn("+/−/90", format="%.2f", width="small"),
-            "Pts": st.column_config.NumberColumn("Pts", width="small"),
-        }
-    else:
-        display_cols = ["Rank", "Crest", "Équipe", "J", "G", "N", "P", "BP", "BC", "Diff", "Pts"]
-        col_cfg = {
-            "Rank": st.column_config.NumberColumn("#", width="small"),
-            "Crest": st.column_config.ImageColumn("", width="small"),
-            "Équipe": st.column_config.TextColumn("Team"),
-            "J": st.column_config.NumberColumn("M", width="small"),
-            "G": st.column_config.NumberColumn("W", width="small"),
-            "N": st.column_config.NumberColumn("D", width="small"),
-            "P": st.column_config.NumberColumn("L", width="small"),
-            "BP": st.column_config.NumberColumn("GF", width="small"),
-            "BC": st.column_config.NumberColumn("GA", width="small"),
-            "Diff": st.column_config.NumberColumn("+/−", width="small"),
-            "Pts": st.column_config.NumberColumn("Pts", width="small"),
-        }
-
-    st.dataframe(
-        disp[display_cols],
-        column_config=col_cfg,
-        use_container_width=True,
-        hide_index=True,
+    st.markdown(
+        _standings_html(standings, per90=(stat_mode == "Per 90 min")),
+        unsafe_allow_html=True,
     )
 
     st.markdown('<span class="sl">Top 10 — Goals scored</span>', unsafe_allow_html=True)
     top10 = standings.nlargest(10, "BP")[["Équipe", "BP"]].sort_values("BP")
+    # Un seul usage de l'or par figure : la meilleure attaque. Le reste recule.
+    colors = [C["ink_3"]] * len(top10)
+    if len(colors):
+        colors[-1] = C["accent"]
     fig2 = go.Figure(
         go.Bar(
             x=top10["BP"],
             y=top10["Équipe"],
             orientation="h",
-            marker=dict(color="#4CAF7D"),
+            marker=dict(color=colors),
             width=0.55,
-            hovertemplate="%{y}: <b>%{x}</b><extra></extra>",
+            hovertemplate="%{y}: <b>%{x}</b> goals<extra></extra>",
         )
     )
     fig2.update_layout(
-        **_PLOTLY,
-        height=320,
-        xaxis_title=None,
-        yaxis_title=None,
-        bargap=0.35,
+        **theme.plotly_layout(
+            height=340,
+            xaxis=dict(
+                gridcolor=C["line_2"],
+                linecolor="rgba(0,0,0,0)",
+                tickcolor=C["ink_3"],
+                zeroline=False,
+                title=None,
+            ),
+            yaxis=dict(
+                gridcolor="rgba(0,0,0,0)",
+                linecolor="rgba(0,0,0,0)",
+                tickcolor="rgba(0,0,0,0)",
+                zeroline=False,
+                title=None,
+            ),
+            bargap=0.35,
+            margin=dict(l=0, r=0, t=16, b=0),
+        )
     )
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -1047,9 +728,16 @@ elif page == "Prediction":
     model = get_model(selected_league)
 
     if model is None:
-        st.warning(
-            f"Modèle non disponible pour {competition_label} — lancez "
-            "`python scripts/train_all_models.py` puis redéployez l'application."
+        st.markdown(
+            theme.state_block(
+                f"No trained model for {competition_label}",
+                "Models are trained offline and committed as artefacts. Run "
+                "<code>python scripts/train_all_models.py</code> to produce them, "
+                "then redeploy. Every other competition remains available from "
+                "the sidebar.",
+                stop=True,
+            ),
+            unsafe_allow_html=True,
         )
         st.stop()
 
@@ -1092,23 +780,33 @@ elif page == "Prediction":
     if st.button("Predict", use_container_width=True, type="primary"):
         X_pred = build_prediction_row(df_feat, home_team, away_team)
         if X_pred is None:
-            st.warning(
-                "Not enough historical data for one of these teams. "
-                "Try a different combination."
+            st.markdown(
+                theme.state_block(
+                    "Not enough history for this fixture",
+                    "The features are rolling averages over past matches, so a "
+                    "team needs a played record before it can be predicted — "
+                    "newly promoted sides early in the season often do not have "
+                    "one yet. Pick another pairing.",
+                ),
+                unsafe_allow_html=True,
             )
         else:
             proba = predict_proba(model, X_pred)
             # LABEL_MAP = {"H": 0, "D": 1, "A": 2}
             max_idx = int(proba.argmax())
 
-            outcome_defs = [
-                ("Home win", "#4CAF7D"),
-                ("Draw", "#888888"),
-                ("Away win", "#E05C5C"),
-            ]
+            # Trois issues, aucune n'est « bonne » ou « mauvaise » : le vert et
+            # le rouge diraient le contraire. Seule l'issue prédite prend l'or,
+            # les deux autres reculent.
+            outcome_labels = ["Home win", "Draw", "Away win"]
             bars_html = "".join(
-                _prob_bar(lbl, float(proba[i]), color, i == max_idx)
-                for i, (lbl, color) in enumerate(outcome_defs)
+                _prob_bar(
+                    lbl,
+                    float(proba[i]),
+                    C["accent"] if i == max_idx else C["ink_3"],
+                    i == max_idx,
+                )
+                for i, lbl in enumerate(outcome_labels)
             )
             st.markdown(
                 f'<div class="prob-section">{bars_html}</div>',
@@ -1118,8 +816,11 @@ elif page == "Prediction":
             acc_value = f"{acc:.1%}" if acc is not None else "N/A"
             if acc is not None:
                 delta = acc - baseline
-                delta_cls = "pos" if delta >= 0 else "neg"
-                delta_html = f'<div class="acc-delta {delta_cls}">{delta:+.1%} vs baseline</div>'
+                delta_cls = theme.measure_class(delta, tolerance=0.0005)
+                delta_html = (
+                    f'<div class="acc-delta {delta_cls}">'
+                    f"{delta * 100:+.1f} pts vs baseline</div>"
+                )
             else:
                 delta_html = ""
             st.markdown(
