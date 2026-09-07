@@ -2,17 +2,36 @@
 
 ## Prérequis
 
-1. **Générer le cache local** (nécessite des credentials AWS) :
+Le dashboard ne lit que les marts dbt exportés en Parquet. Les produire demande
+trois étapes, dont une seule a besoin d'AWS.
+
+1. **Rafraîchir l'instantané de la zone curated** (credentials AWS requis) :
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements.txt -r requirements-dev.txt
    python scripts/export_cache.py
    ```
-   Cela crée `data/cache/matches_PL_2025.parquet`.
+   Cela écrit `data/cache/matches_{CODE}_2025.parquet` et
+   `data/cache/matches_all_2025.parquet`.
 
-2. **Committer le cache** dans le repo (le fichier `.parquet` est inclus volontairement) :
+2. **Construire et tester la couche dbt**, puis exporter les marts (aucun
+   credential : la cible `dev` lit l'instantané ci-dessus) :
    ```bash
-   git add data/cache/matches_PL_2025.parquet
-   git commit -m "data: add PL 2025 match cache for Streamlit app"
+   pip install -r requirements-dbt.txt        # dans .venv-dbt, voir README
+   export DBT_PROFILES_DIR=$PWD/dbt
+   dbt deps  --project-dir dbt
+   dbt build --project-dir dbt --target dev
+   python scripts/export_marts.py --source duckdb
+   ```
+
+   Ou, si le compte dispose des droits Athena, directement depuis la
+   production : `dbt build --project-dir dbt --target athena` puis
+   `python scripts/export_marts.py`.
+
+3. **Committer les marts** (les `.parquet` de `data/marts/` sont versionnés
+   volontairement) :
+   ```bash
+   git add data/cache/*.parquet data/marts/*.parquet
+   git commit -m "data: refresh dbt marts"
    git push
    ```
 
@@ -31,15 +50,15 @@
 > du repo ; il n'existe pas de réglage pour pointer vers un autre fichier.
 > C'est pourquoi `requirements.txt` contient aussi `streamlit` et `plotly`.
 
-> L'app fonctionnera entièrement **sans credentials AWS** grâce au cache Parquet
-> committé dans le repo.
+> L'app fonctionnera entièrement **sans credentials AWS** grâce aux marts
+> Parquet committés dans `data/marts/`.
 
 ### Variables d'environnement
 
 **Aucune variable n'est nécessaire** pour le dashboard Streamlit.
 
-Les credentials AWS ne sont requis que pour `scripts/export_cache.py`,
-qui s'exécute en local avant le déploiement.
+Les credentials AWS ne sont requis que pour `scripts/export_cache.py` (ou pour
+un `dbt build --target athena`), qui s'exécutent en local avant le déploiement.
 
 ### Option B — Docker (auto-hébergé)
 
@@ -62,9 +81,12 @@ docker run -p 8501:8501 football-pipeline
 Pour rafraîchir le cache avec les derniers matchs :
 
 ```bash
-python scripts/export_cache.py
-git add data/cache/matches_PL_2025.parquet
-git commit -m "data: refresh PL cache $(date +%Y-%m-%d)"
+python scripts/export_cache.py                    # S3 -> data/cache/
+dbt build --project-dir dbt --target dev          # modèles + tests
+python scripts/export_marts.py --source duckdb    # -> data/marts/
+python scripts/train_all_models.py                # modèles + metrics.json
+git add data/cache/*.parquet data/marts/*.parquet models/
+git commit -m "data: refresh marts $(date +%Y-%m-%d)"
 git push
 ```
 

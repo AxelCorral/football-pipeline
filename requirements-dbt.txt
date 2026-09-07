@@ -1,0 +1,20 @@
+# Couche de transformation dbt — installée dans un environnement séparé.
+#
+# dbt épingle ses propres versions de jinja2, click et protobuf ; les mélanger
+# à requirements.txt contraindrait inutilement Streamlit et le pipeline ETL.
+# Voir README, section « dbt ».
+#
+#   python -m venv .venv-dbt
+#   .venv-dbt/Scripts/activate        # Windows
+#   source .venv-dbt/bin/activate     # Linux / macOS
+#   pip install -r requirements-dbt.txt
+
+dbt-core==1.11.14
+
+# Cible de production : Athena lit la table Glue `matches` et matérialise les
+# modèles en Parquet sur S3.
+dbt-athena==1.11.0
+
+# Cibles dev / CI : mêmes modèles, exécutés sur l'instantané Parquet versionné
+# (ou sur la zone curated S3), sans dépendre des droits Athena/Glue.
+dbt-duckdb==1.11.0

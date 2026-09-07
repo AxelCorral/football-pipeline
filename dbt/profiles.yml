@@ -16,6 +16,10 @@
 #             dbt matérialise les modèles en Parquet sous s3://…/dbt/.
 #
 # Choix de la cible : `dbt build --target athena`, ou DBT_TARGET.
+#
+# Toutes les commandes dbt se lancent depuis la RACINE du dépôt, avec
+# `--project-dir dbt`. dbt ne change pas de répertoire de travail, et les
+# chemins relatifs de ce fichier comme des sources sont résolus depuis là.
 
 football_pipeline:
   target: "{{ env_var('DBT_TARGET', 'dev') }}"
@@ -23,7 +27,7 @@ football_pipeline:
 
     dev:
       type: duckdb
-      path: "football_pipeline.duckdb"
+      path: "dbt/football_pipeline.duckdb"
       threads: 4
       # Les timestamps curated sont en UTC ; sans ce réglage DuckDB les
       # convertirait dans le fuseau de la machine au moment du CAST, et les
@@ -33,7 +37,7 @@ football_pipeline:
 
     dev_s3:
       type: duckdb
-      path: "football_pipeline_s3.duckdb"
+      path: "dbt/football_pipeline_s3.duckdb"
       threads: 4
       extensions:
         - httpfs

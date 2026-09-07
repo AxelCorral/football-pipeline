@@ -1,5 +1,6 @@
 stages:
   - lint
+  - dbt
   - test
   - model
   - build
@@ -45,6 +46,70 @@ lint:black:
     - black --check src/ tests/
 
 # ==============================================================================
+# DBT
+# ==============================================================================
+#
+# Ce qui tourne ici, et ce qui n'y tourne pas.
+#
+# `dbt build --target dev` exécute les modèles ET leurs tests pour de vrai, sur
+# l'instantané Parquet versionné dans data/cache/, via DuckDB : aucun
+# credential, aucun coût Athena, et la couche de qualité est réellement
+# vérifiée à chaque commit — y compris les tests de fuite temporelle.
+#
+# La cible Athena, elle, n'est que parsée. Un `dbt compile --target athena`
+# demande glue:GetTables pour résoudre la source, donc des credentials AWS
+# ; les faire porter à toute la CI pour compiler du SQL n'en vaut pas le prix,
+# et une exécution Athena sur chaque branche encore moins. Le job dbt:parse
+# valide malgré tout le projet contre l'adaptateur de production : profil,
+# sources, refs, macros, syntaxe Jinja.
+#
+# Ce que la CI ne peut donc pas attraper : une divergence de dialecte entre
+# DuckDB et Trino. Elle se voit au premier `dbt build --target athena` lancé à
+# la main. Voir docs/dbt.md, section « Limites ».
+
+.dbt-base:
+  image: python:3.12-slim
+  stage: dbt
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}-pip-dbt"
+    paths:
+      - .cache/pip
+  variables:
+    DBT_PROFILES_DIR: "$CI_PROJECT_DIR/dbt"
+  before_script:
+    - pip install -r requirements-dbt.txt
+    - dbt deps --project-dir dbt
+
+dbt:parse:
+  extends: .dbt-base
+  script:
+    - dbt parse --project-dir dbt --target athena
+
+dbt:build:
+  extends: .dbt-base
+  script:
+    - dbt build --project-dir dbt --target dev
+  artifacts:
+    when: always
+    paths:
+      - dbt/target/manifest.json
+      - dbt/target/run_results.json
+    expire_in: 30 days
+
+dbt:docs:
+  extends: .dbt-base
+  script:
+    - dbt docs generate --project-dir dbt --target dev
+  artifacts:
+    paths:
+      - dbt/target/index.html
+      - dbt/target/manifest.json
+      - dbt/target/catalog.json
+    expire_in: 30 days
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ==============================================================================
 # TEST
 # ==============================================================================
 
@@ -78,8 +143,13 @@ test:unit:
 model:train:
   extends: .python-base
   stage: model
+  before_script:
+    - pip install -r requirements.txt -r requirements-dev.txt
   script:
-    - python -m src.ml.train
+    # Entraîne à partir du mart versionné dans data/marts/. Reconstruire la
+    # couche dbt ici demanderait un accès Athena ; l'export est un artefact du
+    # dépôt, régénéré par `python scripts/export_marts.py` avant commit.
+    - python scripts/train_all_models.py
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
   artifacts:
@@ -108,17 +178,26 @@ build:wheel:
 # DEPLOY
 # ==============================================================================
 
-deploy:sql-sync:
+# Remplace l'ancien deploy:sql-sync, qui poussait queries/*.sql sur S3 : ces
+# requêtes sont devenues des modèles dbt. Le déploiement consiste maintenant à
+# matérialiser les modèles dans le schéma Athena de production.
+#
+# Manuel et réservé à main : ce job écrit dans Glue et facture des scans
+# Athena. Il exige les variables CI/CD protégées AWS_ACCESS_KEY_ID,
+# AWS_SECRET_ACCESS_KEY et AWS_DEFAULT_REGION, et un rôle disposant des droits
+# Athena/Glue/S3 — que le compte de développement du projet n'a pas.
+deploy:dbt-athena:
+  extends: .dbt-base
   stage: deploy
-  image:
-    name: amazon/aws-cli:latest
-    entrypoint: [""]
+  variables:
+    DBT_PROFILES_DIR: "$CI_PROJECT_DIR/dbt"
+    DBT_ATHENA_SCHEMA: football_analytics
   script:
-    - aws s3 sync queries/ s3://football-pipeline-axel/scripts/ --exclude "*" --include "*.sql"
+    - dbt build --project-dir dbt --target athena
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
       allow_failure: false
   environment:
     name: production
-    url: https://s3.console.aws.amazon.com/s3/buckets/football-pipeline-axel
+    url: https://eu-west-1.console.aws.amazon.com/athena/home

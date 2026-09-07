@@ -27,9 +27,11 @@ sources:
           # Read by dbt-duckdb only (dev / dev_s3 targets); dbt-athena ignores
           # it and resolves the Glue table above. Same columns either way: the
           # local snapshot and the S3 curated files are written by the same
-          # Python transform.
+          # Python transform. The path is relative to the repository root —
+          # dbt does not chdir into --project-dir. Override with
+          # DBT_SOURCE_MATCHES to point at the curated zone on S3.
           external_location: >-
-            read_parquet('{{ env_var("DBT_SOURCE_MATCHES", "../data/cache/matches_all_*.parquet") }}',
+            read_parquet('{{ env_var("DBT_SOURCE_MATCHES", "data/cache/matches_all_*.parquet") }}',
             union_by_name = true)
         columns:
           - name: match_id
