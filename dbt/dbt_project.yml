@@ -1,0 +1,37 @@
+name: football_pipeline
+version: "1.0.0"
+config-version: 2
+
+profile: football_pipeline
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# Fenêtre glissante utilisée par tous les modèles de forme. Une seule
+# définition : la changer ici la change dans intermediate et dans les marts.
+vars:
+  form_window: 5
+
+# Toutes les couches sont matérialisées dans le même schéma cible
+# (football_analytics_dev / football_analytics côté Athena, main côté DuckDB).
+# Le préfixe du modèle — stg_ / int_ / fct_ / mart_ — porte déjà la couche, et
+# un schéma unique évite d'exiger un glue:CreateDatabase par couche.
+models:
+  football_pipeline:
+    staging:
+      # Vue : la zone curated tient dans quelques Mo. La matérialiser
+      # coûterait un scan de plus sans rien faire gagner.
+      +materialized: view
+
+    intermediate:
+      # Table : chaque modèle intermédiaire est relu 2 à 4 fois en aval
+      # (features domicile + extérieur, marts analytics). Le matérialiser une
+      # fois coûte moins cher que de recalculer la fenêtre à chaque ref().
+      +materialized: table
+
+    marts:
+      # Table : ce sont les artefacts consommés hors dbt (ML, Streamlit).
+      +materialized: table

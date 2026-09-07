@@ -1,0 +1,58 @@
+# Profil dbt du projet — aucun secret ici.
+#
+# Tout ce qui identifie un compte ou donne un accès passe par une variable
+# d'environnement : les credentials AWS sont résolus par la chaîne boto3
+# habituelle (~/.aws/credentials, variables d'environnement, rôle IAM), jamais
+# écrits dans ce fichier ni dans Git.
+#
+# Cibles :
+#   dev       DuckDB sur l'instantané Parquet versionné (data/cache/). Aucun
+#             credential, aucun coût : c'est la cible du développement local
+#             et de la CI.
+#   dev_s3    DuckDB sur la vraie zone curated S3. Demande un accès S3 en
+#             lecture seule ; sert à valider les modèles sur les données
+#             réelles sans dépendre des droits Athena/Glue.
+#   athena    La cible de production : Athena lit la table Glue `matches` et
+#             dbt matérialise les modèles en Parquet sous s3://…/dbt/.
+#
+# Choix de la cible : `dbt build --target athena`, ou DBT_TARGET.
+
+football_pipeline:
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
+  outputs:
+
+    dev:
+      type: duckdb
+      path: "football_pipeline.duckdb"
+      threads: 4
+      # Les timestamps curated sont en UTC ; sans ce réglage DuckDB les
+      # convertirait dans le fuseau de la machine au moment du CAST, et les
+      # fenêtres glissantes ne seraient plus reproductibles d'un poste à l'autre.
+      settings:
+        TimeZone: "UTC"
+
+    dev_s3:
+      type: duckdb
+      path: "football_pipeline_s3.duckdb"
+      threads: 4
+      extensions:
+        - httpfs
+      secrets:
+        - type: s3
+          provider: credential_chain
+          region: "{{ env_var('AWS_REGION', 'eu-west-1') }}"
+      settings:
+        TimeZone: "UTC"
+
+    athena:
+      type: athena
+      threads: 4
+      region_name: "{{ env_var('AWS_REGION', 'eu-west-1') }}"
+      database: "{{ env_var('DBT_ATHENA_CATALOG', 'awsdatacatalog') }}"
+      # Schéma d'écriture dbt — distinct de la base source `football_db`, pour
+      # que dbt ne puisse jamais écrire par-dessus la zone curated.
+      schema: "{{ env_var('DBT_ATHENA_SCHEMA', 'football_analytics_dev') }}"
+      s3_staging_dir: "{{ env_var('ATHENA_OUTPUT_S3', 's3://football-pipeline-axel/athena-results/') }}"
+      s3_data_dir: "s3://{{ env_var('AWS_BUCKET_NAME', 'football-pipeline-axel') }}/dbt/"
+      s3_data_naming: schema_table
+      work_group: "{{ env_var('ATHENA_WORKGROUP', 'primary') }}"

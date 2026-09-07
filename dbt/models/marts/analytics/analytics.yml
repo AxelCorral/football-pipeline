@@ -1,0 +1,237 @@
+version: 2
+
+models:
+  - name: mart_league_overview
+    description: >
+      One row per competition and season: volume, goals and home advantage.
+      Replaces `queries/home_advantage.sql` and the KPI block the dashboard used
+      to recompute in pandas on every render.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [competition_code, season]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_wins + draws + away_wins = matches_played"
+          name: mart_league_overview_results_add_up_to_matches
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "abs(home_win_pct + draw_pct + away_win_pct - 100) < 0.05"
+          name: mart_league_overview_percentages_add_up_to_100
+    columns:
+      - name: competition_code
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["PL", "FL1", "BL1", "SA", "PD"]
+      - name: competition_name
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: teams
+        description: Distinct teams that appear in the competition that season.
+        data_tests: [not_null]
+      - name: matches_played
+        description: Matches with a final score.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 1, inclusive: true}
+      - name: goals_scored
+        description: Total goals across those matches.
+        data_tests: [not_null]
+      - name: home_wins
+        description: Matches won by the home side.
+      - name: draws
+        description: Matches drawn.
+      - name: away_wins
+        description: Matches won by the away side.
+      - name: first_match_date
+        description: Earliest kick-off played.
+      - name: last_match_date
+        description: Latest kick-off played.
+      - name: avg_goals_per_match
+        description: goals_scored / matches_played.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 10, inclusive: true}
+      - name: home_win_pct
+        description: Share of home wins, in percent.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 100, inclusive: true}
+      - name: draw_pct
+        description: Share of draws, in percent.
+      - name: away_win_pct
+        description: Share of away wins, in percent.
+
+  - name: mart_matchweek_goals
+    description: >
+      Goal volume per matchweek, approximated by calendar week — the fixtures of
+      a matchday are played over two or three consecutive days. Replaces
+      `queries/avg_goals_per_round.sql` and the ISO-week groupby the dashboard
+      did in pandas. The API exposes a real `matchday` field; the Python
+      ingestion does not carry it into the curated zone yet, which is the only
+      reason for the approximation.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [competition_code, season, matchweek_start]
+    columns:
+      - name: competition_code
+        data_tests: [not_null]
+      - name: competition_name
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: matchweek_start
+        description: Monday of the calendar week the fixtures were played in.
+        data_tests: [not_null]
+      - name: matches_played
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 1, inclusive: true}
+      - name: goals_scored
+        data_tests: [not_null]
+      - name: max_goals_in_match
+        description: Highest-scoring fixture of the week.
+      - name: min_goals_in_match
+        description: Lowest-scoring fixture of the week.
+      - name: avg_goals_per_match
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 15, inclusive: true}
+
+  - name: mart_team_form
+    description: >
+      One row per team and season: season-to-date record — overall, home and
+      away — plus the team's most recent form.
+
+
+      Two consumers, two needs. The Standings page shows the cumulative record
+      in its three modes; the Prediction page needs the current form of any
+      team, to build a fixture the calendar does not contain. This mart replaces
+      `compute_standings()` and `build_prediction_row()` on the Python side, and
+      `queries/top_scorers.sql`.
+
+
+      The form reported is the one that follows the team's last played match. It
+      describes no particular fixture and therefore cannot leak: it is only
+      valid for a fixture later than `form_as_of`.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [team, competition_code, season]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "wins + draws + losses = matches_played"
+          name: mart_team_form_record_adds_up_to_matches_played
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "points = wins * 3 + draws"
+          name: mart_team_form_points_follow_football_scoring
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_matches_played + away_matches_played = matches_played"
+          name: mart_team_form_home_and_away_split_covers_every_match
+    columns:
+      - name: team
+        data_tests: [not_null]
+      - name: competition_code
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["PL", "FL1", "BL1", "SA", "PD"]
+      - name: competition_name
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: matches_played
+        description: Matches played this season.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 1, inclusive: true}
+      - name: wins
+        data_tests: [not_null]
+      - name: draws
+        data_tests: [not_null]
+      - name: losses
+        data_tests: [not_null]
+      - name: goals_for
+        data_tests: [not_null]
+      - name: goals_against
+        data_tests: [not_null]
+      - name: goal_difference
+        description: goals_for - goals_against.
+      - name: points
+        description: Championship points, 3 for a win and 1 for a draw.
+        data_tests: [not_null]
+      - name: home_matches_played
+        description: Matches played at home.
+      - name: home_wins
+      - name: home_draws
+      - name: home_losses
+      - name: home_goals_for
+      - name: home_goals_against
+      - name: home_goal_difference
+      - name: home_points
+      - name: away_matches_played
+        description: Matches played away.
+      - name: away_wins
+      - name: away_draws
+      - name: away_losses
+      - name: away_goals_for
+      - name: away_goals_against
+      - name: away_goal_difference
+      - name: away_points
+      - name: form_as_of
+        description: Kick-off of the team's last played match.
+        data_tests: [not_null]
+      - name: form_matches
+        description: "Matches in the rolling window (1..5)."
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 1, max_value: 5, inclusive: true}
+      - name: form_points
+        description: Points over the last 5 matches.
+      - name: form_wins
+      - name: form_draws
+      - name: form_losses
+      - name: form_goal_difference
+      - name: form_avg_points
+        description: Points per match over the last 5 matches.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 3, inclusive: true}
+      - name: form_avg_goals_for
+      - name: form_avg_goals_against
+      - name: home_form_as_of
+        description: Kick-off of the team's last home match.
+      - name: home_form_matches
+        description: "Matches in the home-only window (1..5)."
+      - name: home_form_avg_points
+        description: Points per home match over the last 5 home matches.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 3, inclusive: true}
+      - name: home_form_avg_goals_for
+        description: Goals scored per home match over the last 5 home matches.
+      - name: home_form_avg_goals_against
+        description: Goals conceded per home match over the last 5 home matches.
+      - name: away_form_as_of
+        description: Kick-off of the team's last away match.
+      - name: away_form_matches
+        description: "Matches in the away-only window (1..5)."
+      - name: away_form_avg_points
+        description: Points per away match over the last 5 away matches.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 3, inclusive: true}
+      - name: away_form_avg_goals_for
+        description: Goals scored per away match over the last 5 away matches.
+      - name: away_form_avg_goals_against
+        description: Goals conceded per away match over the last 5 away matches.

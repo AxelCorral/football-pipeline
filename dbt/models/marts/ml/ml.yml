@@ -1,0 +1,212 @@
+version: 2
+
+models:
+  - name: fct_match_features
+    description: >
+      The contract between dbt and the Python ML pipeline: one row per match,
+      pre-match features on the left, target on the right. `src/ml` loads this
+      table and does nothing to it but select columns, split on time, fit and
+      evaluate.
+
+
+      **How leakage is prevented.** A team's form for match M is the row of
+      `int_team_form` / `int_home_away_form` whose rank equals the number of
+      matches that team had played strictly before M. The match itself is
+      therefore never in its own window, and no later match can enter it,
+      because ranks follow (match_date, match_id). Ranking played matches rather
+      than framing over rows is what makes this exact when postponed or future
+      fixtures sit in the middle of a calendar. `home_form_as_of` /
+      `away_form_as_of` expose the last kick-off included in each window; the
+      singular test `assert_no_future_information_in_features` asserts both are
+      strictly earlier than the match being described.
+
+
+      **Missing history.** A team with no played match before M — opening
+      fixture, newly promoted side — gets NULL features and
+      `*_matches_played = 0`. Nothing is imputed to zero, because a zero would
+      be indistinguishable from "played and took no points". Deciding which rows
+      are usable belongs to the consumer.
+
+
+      **Columns prefixed `target_`** are only known after the final whistle. No
+      feature derives from them.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_form_as_of < match_date"
+          config:
+            where: "home_form_as_of is not null"
+          name: fct_match_features_home_form_predates_kickoff
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "away_form_as_of < match_date"
+          config:
+            where: "away_form_as_of is not null"
+          name: fct_match_features_away_form_predates_kickoff
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_form_matches is null and home_avg_points_last_5 is null"
+          config:
+            where: "home_matches_played = 0"
+          name: fct_match_features_no_history_means_null_features
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_matches_played >= home_home_matches_played"
+          name: fct_match_features_home_history_contains_home_history
+    columns:
+      - name: match_id
+        description: Primary key — one row per match.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_matches')
+                field: match_id
+      - name: match_date
+        description: Kick-off timestamp, UTC. The split column for temporal train/test.
+        data_tests: [not_null]
+      - name: competition_code
+        description: "PL / FL1 / BL1 / SA / PD — the per-league models filter on it."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["PL", "FL1", "BL1", "SA", "PD"]
+      - name: competition_name
+        description: Competition display name.
+      - name: season
+        description: Season start year. Form windows never cross a season boundary.
+        data_tests: [not_null]
+      - name: status
+        description: Raw football-data.org status, kept for traceability.
+      - name: is_played
+        description: Whether the match has a final score — equivalently, whether a target exists.
+        data_tests: [not_null]
+      - name: home_team
+        data_tests: [not_null]
+      - name: away_team
+        data_tests: [not_null]
+
+      - name: home_matches_played
+        description: Matches the home side had played before this one. 0 means no history.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, inclusive: true}
+      - name: away_matches_played
+        description: Matches the away side had played before this one.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, inclusive: true}
+      - name: home_home_matches_played
+        description: Home matches the home side had played before this one.
+        data_tests: [not_null]
+      - name: away_away_matches_played
+        description: Away matches the away side had played before this one.
+        data_tests: [not_null]
+
+      - name: home_form_as_of
+        description: >
+          Kick-off of the last match in the home side's form window. Must be
+          strictly before match_date — that is the leakage guarantee, expressed
+          as data rather than as a comment.
+      - name: away_form_as_of
+        description: Same, for the away side.
+
+      - name: home_form_matches
+        description: "Matches in the home side's overall window (1..5), NULL if no history."
+      - name: away_form_matches
+        description: "Matches in the away side's overall window (1..5), NULL if no history."
+      - name: home_points_last_5
+        description: Points taken by the home side over its last 5 matches, all fixtures.
+      - name: away_points_last_5
+        description: Points taken by the away side over its last 5 matches, all fixtures.
+      - name: home_avg_points_last_5
+        description: Points per match, home side, last 5 matches.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 3, inclusive: true}
+      - name: away_avg_points_last_5
+        description: Points per match, away side, last 5 matches.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 3, inclusive: true}
+      - name: home_wins_last_5
+        description: Wins by the home side over its last 5 matches.
+      - name: away_wins_last_5
+        description: Wins by the away side over its last 5 matches.
+      - name: home_draws_last_5
+        description: Draws by the home side over its last 5 matches.
+      - name: away_draws_last_5
+        description: Draws by the away side over its last 5 matches.
+      - name: home_losses_last_5
+        description: Losses by the home side over its last 5 matches.
+      - name: away_losses_last_5
+        description: Losses by the away side over its last 5 matches.
+      - name: home_goals_for_last_5
+        description: Goals scored by the home side over its last 5 matches.
+      - name: away_goals_for_last_5
+        description: Goals scored by the away side over its last 5 matches.
+      - name: home_goals_against_last_5
+        description: Goals conceded by the home side over its last 5 matches.
+      - name: away_goals_against_last_5
+        description: Goals conceded by the away side over its last 5 matches.
+      - name: home_goal_diff_last_5
+        description: Goal difference of the home side over its last 5 matches.
+      - name: away_goal_diff_last_5
+        description: Goal difference of the away side over its last 5 matches.
+      - name: home_avg_goals_for_last_5
+        description: Goals scored per match, home side, last 5 matches.
+      - name: away_avg_goals_for_last_5
+        description: Goals scored per match, away side, last 5 matches.
+      - name: home_avg_goals_against_last_5
+        description: Goals conceded per match, home side, last 5 matches.
+      - name: away_avg_goals_against_last_5
+        description: Goals conceded per match, away side, last 5 matches.
+
+      - name: home_home_form_matches
+        description: "Matches in the home side's home-only window (1..5)."
+      - name: away_away_form_matches
+        description: "Matches in the away side's away-only window (1..5)."
+      - name: home_home_avg_points_last_5
+        description: >
+          Points per match taken by the home side in its last 5 HOME matches.
+          Feature `home_form` of the trained models.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 3, inclusive: true}
+      - name: away_away_avg_points_last_5
+        description: >
+          Points per match taken by the away side in its last 5 AWAY matches.
+          Feature `away_form` of the trained models.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 3, inclusive: true}
+      - name: home_home_avg_goals_for_last_5
+        description: Goals scored per home match by the home side. Feature `home_goals_avg`.
+      - name: away_away_avg_goals_for_last_5
+        description: Goals scored per away match by the away side. Feature `away_goals_avg`.
+      - name: home_home_avg_goals_against_last_5
+        description: Goals conceded per home match by the home side. Feature `home_conceded_avg`.
+      - name: away_away_avg_goals_against_last_5
+        description: Goals conceded per away match by the away side. Feature `away_conceded_avg`.
+
+      - name: target_home_goals
+        description: Final home score. Known only after the match — never a feature.
+      - name: target_away_goals
+        description: Final away score. Known only after the match — never a feature.
+      - name: target_result
+        description: >
+          H (home win) / D (draw) / A (away win). The label. NULL while the match
+          has not been played, which is exactly the set of rows that cannot be
+          trained on.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["H", "D", "A"]
+          - not_null:
+              config:
+                where: "is_played"
+              name: fct_match_features_played_match_always_has_a_target

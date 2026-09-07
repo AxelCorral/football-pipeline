@@ -1,0 +1,248 @@
+version: 2
+
+models:
+  - name: int_team_match_results
+    description: >
+      Pivots the match grain into a team grain: every match produces two rows,
+      one per team, with goals for/against, outcome and points from that team's
+      point of view. This is the shape in which a team's history can be computed
+      without treating home and away columns separately.
+
+
+      It also carries the chronology counters used downstream —
+      `prior_played_matches` and `prior_played_matches_same_side` count matches
+      that were actually played strictly before the current row. Counting played
+      matches rather than rows is what keeps the feature build correct when
+      postponed or future fixtures sit in the middle of a team's calendar.
+
+
+      Materialised as a table: it is read four times downstream (overall form,
+      home/away form, both analytics marts).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [match_id, home_away]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "team <> opponent"
+          name: int_team_match_results_team_is_never_its_own_opponent
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "points in (0, 1, 3)"
+          config:
+            where: "is_played"
+          name: int_team_match_results_points_follow_football_scoring
+    columns:
+      - name: match_id
+        description: Match this row belongs to.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_matches')
+                field: match_id
+      - name: match_date
+        description: Kick-off timestamp, UTC.
+        data_tests:
+          - not_null
+      - name: team
+        description: The team this row describes.
+        data_tests:
+          - not_null
+      - name: opponent
+        description: The other team.
+        data_tests:
+          - not_null
+      - name: home_away
+        description: Which side of the fixture this team was on.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["HOME", "AWAY"]
+      - name: goals_for
+        description: Goals scored by `team`; NULL while the match has no score.
+      - name: goals_against
+        description: Goals conceded by `team`; NULL while the match has no score.
+      - name: goal_difference
+        description: goals_for - goals_against for this single match.
+      - name: is_played
+        description: Whether the match has a final score.
+        data_tests:
+          - not_null
+      - name: outcome
+        description: WIN / DRAW / LOSS from `team`'s point of view; NULL if not played.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["WIN", "DRAW", "LOSS"]
+      - name: points
+        description: "3 / 1 / 0; NULL if not played."
+      - name: played_seq
+        description: >
+          Rank of this match in the team's played history for the season, 1-based.
+          NULL for a match with no score, so that unplayed fixtures never consume
+          a rank.
+      - name: played_seq_same_side
+        description: Same rank, restricted to the matches played on this side (home or away).
+      - name: prior_played_matches
+        description: >
+          Number of matches this team had played, in this competition and season,
+          strictly before this one. Defined for every row — played or not — which
+          is what lets an upcoming fixture be given a pre-match form.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: prior_played_matches_same_side
+        description: Same counter, restricted to the same side of the fixture.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+
+  - name: int_team_form
+    description: >
+      Rolling form over the last `form_window` (5) played matches, all fixtures
+      combined. One row per team, season and played match rank.
+
+
+      A row describes the state of a team AFTER its n-th played match — the
+      window includes match n. That is deliberate, and it is not where leakage
+      is prevented: leakage is prevented by the join in `fct_match_features`,
+      which attaches match M to the row whose rank equals the number of matches
+      played strictly before M. `form_as_of` carries the date of the last match
+      in the window so any consumer can check that claim itself.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [team, competition_code, season, played_seq]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "form_wins + form_draws + form_losses = matches_in_window"
+          name: int_team_form_window_outcomes_add_up
+    columns:
+      - name: team
+        data_tests: [not_null]
+      - name: competition_code
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: played_seq
+        description: Rank of the last match included in the window.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: form_as_of
+        description: Kick-off of the last match included in the window.
+        data_tests: [not_null]
+      - name: matches_in_window
+        description: "Between 1 and 5 — smaller early in the season, never zero."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 5
+                inclusive: true
+      - name: form_points
+        description: Points taken in the window.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 15
+                inclusive: true
+      - name: form_wins
+        description: Wins in the window.
+      - name: form_draws
+        description: Draws in the window.
+      - name: form_losses
+        description: Losses in the window.
+      - name: form_goals_for
+        description: Goals scored in the window.
+      - name: form_goals_against
+        description: Goals conceded in the window.
+      - name: form_goal_difference
+        description: form_goals_for - form_goals_against.
+      - name: form_avg_points
+        description: Points per match over the window.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 3
+                inclusive: true
+      - name: form_avg_goals_for
+        description: Goals scored per match over the window.
+      - name: form_avg_goals_against
+        description: Goals conceded per match over the window.
+
+  - name: int_home_away_form
+    description: >
+      Same rolling form as `int_team_form`, but restricted to one side of the
+      fixture: a team's last five home matches on one hand, its last five away
+      matches on the other. These are the columns the model actually consumes —
+      what a side does away from home explains an away fixture better than its
+      overall form does.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [team, competition_code, season, home_away, played_seq_same_side]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "form_wins + form_draws + form_losses = matches_in_window"
+          name: int_home_away_form_window_outcomes_add_up
+    columns:
+      - name: team
+        data_tests: [not_null]
+      - name: competition_code
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: home_away
+        description: Side of the fixture this form describes.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["HOME", "AWAY"]
+      - name: played_seq_same_side
+        description: Rank of the last match included, among matches played on this side.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: form_as_of
+        description: Kick-off of the last match included in the window.
+        data_tests: [not_null]
+      - name: matches_in_window
+        description: Between 1 and 5.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 5
+                inclusive: true
+      - name: form_avg_points
+        description: Points per match over the window, on this side only.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 3
+                inclusive: true
+      - name: form_avg_goals_for
+        description: Goals scored per match over the window, on this side only.
+      - name: form_avg_goals_against
+        description: Goals conceded per match over the window, on this side only.

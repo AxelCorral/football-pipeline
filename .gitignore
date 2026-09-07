@@ -1,5 +1,7 @@
 # Python
 .venv/
+.venv-dbt/
+.venv-test/
 __pycache__/
 *.pyc
 *.pyo
@@ -36,6 +38,9 @@ data/*
 !data/cache/
 data/cache/*
 !data/cache/*.parquet
+!data/marts/
+data/marts/*
+!data/marts/*.parquet
 *.csv
 
 # Jupyter
@@ -49,3 +54,11 @@ coverage.xml
 
 # mypy
 .mypy_cache/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+dbt/*.duckdb
+dbt/*.duckdb.wal

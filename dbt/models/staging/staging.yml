@@ -1,0 +1,91 @@
+version: 2
+
+models:
+  - name: stg_matches
+    description: >
+      One row per match, cleaned and typed. Renames `date` to `match_date`,
+      normalises statuses, recomputes the H/D/A result from the score so a
+      single rule exists in the project, drops rows that cannot be a match, and
+      removes the duplicates the curated zone accumulates when the ingestion is
+      replayed over the same raw partitions. Materialised as a view: the curated
+      zone is a few megabytes, so materialising it would buy a scan and save
+      nothing.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_goals >= 0 and away_goals >= 0"
+          config:
+            where: "is_played"
+          name: stg_matches_goals_are_not_negative
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_goals = home_goals + away_goals"
+          config:
+            where: "is_played"
+          name: stg_matches_total_goals_is_consistent
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_team <> away_team"
+          name: stg_matches_team_never_plays_itself
+    columns:
+      - name: match_id
+        description: football-data.org match identifier. Primary key of this model.
+        data_tests:
+          - not_null
+          - unique
+      - name: match_date
+        description: Kick-off timestamp in UTC. Ordering key for every rolling window downstream.
+        data_tests:
+          - not_null
+      - name: competition_code
+        description: "Short competition code: PL, FL1, BL1, SA, PD."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["PL", "FL1", "BL1", "SA", "PD"]
+      - name: competition_name
+        description: Competition display name.
+        data_tests:
+          - not_null
+      - name: season
+        description: Season start year — 2025 is the 2025/26 season.
+        data_tests:
+          - not_null
+      - name: home_team
+        description: Home team name.
+        data_tests:
+          - not_null
+      - name: away_team
+        description: Away team name.
+        data_tests:
+          - not_null
+      - name: home_goals
+        description: Full-time home goals; NULL while the match has no score.
+      - name: away_goals
+        description: Full-time away goals; NULL while the match has no score.
+      - name: total_goals
+        description: home_goals + away_goals; NULL while the match has no score.
+      - name: status
+        description: Upper-cased football-data.org status.
+        data_tests:
+          - not_null
+      - name: is_played
+        description: >
+          True when the match has a final score — FINISHED, or AWARDED for a
+          match decided off the pitch. This flag, not `status`, is what decides
+          whether a match enters a team's history downstream.
+        data_tests:
+          - not_null
+      - name: result
+        description: "H (home win) / D (draw) / A (away win); NULL while the match has no score."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["H", "D", "A"]
+          - not_null:
+              config:
+                where: "is_played"
+              name: stg_matches_played_match_always_has_a_result
+      - name: referee
+        description: Main referee; missing for part of the fixtures.

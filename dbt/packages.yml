@@ -1,0 +1,6 @@
+# dbt_utils sert à trois choses ici et rien d'autre : expression_is_true pour
+# les règles métier, unique_combination_of_columns pour vérifier le grain des
+# modèles à clé composite, et accepted_range pour borner les features.
+packages:
+  - package: dbt-labs/dbt_utils
+    version: [">=1.3.0", "<2.0.0"]
