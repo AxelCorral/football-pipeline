@@ -10,12 +10,17 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.ml.evaluate import baseline_accuracy
-from src.ml.features import FEATURE_COLS, compute_features
+from src.marts import (
+    MART_LEAGUE_OVERVIEW,
+    MART_MATCHWEEK_GOALS,
+    MART_TEAM_FORM,
+    mart_path,
+    read_mart,
+)
+from src.ml.features import fixture_features
 from src.ml.inference import load_model, predict_proba
 from src.ui import theme
 
-CACHE_PATH = Path("data/cache/matches_all_2025.parquet")
 METRICS_PATH = Path("models/metrics.json")
 
 COMPETITION_NAMES: dict[str, str] = {
@@ -157,10 +162,12 @@ C = theme.COLOR
 
 
 @st.cache_data
-def load_data() -> pd.DataFrame:
-    if not CACHE_PATH.exists():
+def load_mart(name: str) -> pd.DataFrame:
+    """Un mart dbt exporté, ou un DataFrame vide s'il n'a pas encore été produit."""
+    try:
+        return read_mart(name)
+    except FileNotFoundError:
         return pd.DataFrame()
-    return pd.read_parquet(CACHE_PATH)
 
 
 def _league_key(league: str) -> str:
@@ -191,80 +198,51 @@ def get_league_metrics(league: str) -> dict | None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def compute_standings(finished: pd.DataFrame, mode: str) -> pd.DataFrame:
-    teams = sorted(
-        pd.concat([finished["home_team"], finished["away_team"]]).dropna().unique()
-    )
-    rows = []
-    for team in teams:
-        if mode == "home":
-            m = finished[finished["home_team"] == team]
-            w = int((m["result"] == "H").sum())
-            d = int((m["result"] == "D").sum())
-            l = int((m["result"] == "A").sum())
-            gf = int(m["home_goals"].fillna(0).sum())
-            ga = int(m["away_goals"].fillna(0).sum())
-        elif mode == "away":
-            m = finished[finished["away_team"] == team]
-            w = int((m["result"] == "A").sum())
-            d = int((m["result"] == "D").sum())
-            l = int((m["result"] == "H").sum())
-            gf = int(m["away_goals"].fillna(0).sum())
-            ga = int(m["home_goals"].fillna(0).sum())
-        else:
-            hm = finished[finished["home_team"] == team]
-            am = finished[finished["away_team"] == team]
-            w = int((hm["result"] == "H").sum()) + int((am["result"] == "A").sum())
-            d = int((hm["result"] == "D").sum()) + int((am["result"] == "D").sum())
-            l = int((hm["result"] == "A").sum()) + int((am["result"] == "H").sum())
-            gf = int(hm["home_goals"].fillna(0).sum()) + int(
-                am["away_goals"].fillna(0).sum()
-            )
-            ga = int(hm["away_goals"].fillna(0).sum()) + int(
-                am["home_goals"].fillna(0).sum()
-            )
-        rows.append(
-            {
-                "Équipe": team,
-                "J": w + d + l,
-                "G": w,
-                "N": d,
-                "P": l,
-                "BP": gf,
-                "BC": ga,
-                "Diff": gf - ga,
-                "Pts": w * 3 + d,
-            }
-        )
-    return (
-        pd.DataFrame(rows)
-        .sort_values(["Pts", "Diff", "BP"], ascending=False)
-        .reset_index(drop=True)
-    )
+# Colonnes de mart_team_form selon le mode d'affichage. Le classement n'est
+# plus recalculé ici : le mart porte déjà les trois découpages, il ne reste
+# qu'à choisir le bon jeu de colonnes et à les renommer pour le tableau.
+_STANDINGS_COLUMNS: dict[str, dict[str, str]] = {
+    "both": {
+        "J": "matches_played",
+        "G": "wins",
+        "N": "draws",
+        "P": "losses",
+        "BP": "goals_for",
+        "BC": "goals_against",
+        "Diff": "goal_difference",
+        "Pts": "points",
+    },
+    "home": {
+        "J": "home_matches_played",
+        "G": "home_wins",
+        "N": "home_draws",
+        "P": "home_losses",
+        "BP": "home_goals_for",
+        "BC": "home_goals_against",
+        "Diff": "home_goal_difference",
+        "Pts": "home_points",
+    },
+    "away": {
+        "J": "away_matches_played",
+        "G": "away_wins",
+        "N": "away_draws",
+        "P": "away_losses",
+        "BP": "away_goals_for",
+        "BC": "away_goals_against",
+        "Diff": "away_goal_difference",
+        "Pts": "away_points",
+    },
+}
 
 
-def build_prediction_row(
-    df_feat: pd.DataFrame, home_team: str, away_team: str
-) -> pd.DataFrame | None:
-    home_rows = df_feat[df_feat["home_team"] == home_team].dropna(subset=FEATURE_COLS)
-    away_rows = df_feat[df_feat["away_team"] == away_team].dropna(subset=FEATURE_COLS)
-    if home_rows.empty or away_rows.empty:
-        return None
-    h = home_rows.iloc[-1]
-    a = away_rows.iloc[-1]
-    return pd.DataFrame(
-        [
-            {
-                "home_form": h["home_form"],
-                "away_form": a["away_form"],
-                "home_goals_avg": h["home_goals_avg"],
-                "away_goals_avg": a["away_goals_avg"],
-                "home_conceded_avg": h["home_conceded_avg"],
-                "away_conceded_avg": a["away_conceded_avg"],
-                "home_advantage": 1,
-            }
-        ]
-    )
+def build_standings(team_form: pd.DataFrame, mode: str) -> pd.DataFrame:
+    """Met mart_team_form au format attendu par `_standings_html`."""
+    columns = _STANDINGS_COLUMNS[mode]
+    standings = pd.DataFrame({"Équipe": team_form["team"].to_numpy()})
+    for label, source in columns.items():
+        standings[label] = team_form[source].fillna(0).astype(int).to_numpy()
+    ranked = standings.sort_values(["Pts", "Diff", "BP"], ascending=False)
+    return ranked.reset_index(drop=True)
 
 
 def _standings_html(standings: pd.DataFrame, per90: bool = False) -> str:
@@ -419,57 +397,67 @@ page = st.sidebar.radio(
     label_visibility="collapsed",
 )
 
-df = load_data()
+overview_all = load_mart(MART_LEAGUE_OVERVIEW)
+team_form_all = load_mart(MART_TEAM_FORM)
+matchweek_all = load_mart(MART_MATCHWEEK_GOALS)
 
-if df.empty:
+if overview_all.empty or team_form_all.empty:
     st.markdown(
         theme.state_block(
-            "No local cache to read",
-            "This dashboard reads a pre-built Parquet cache and needs no AWS "
-            "credentials at runtime — but the file has to exist. Expected at "
-            "<code>data/cache/matches_all_2025.parquet</code>. Generate it with "
-            "<code>python scripts/export_cache.py</code>, which is the only step "
-            "that does need AWS access.",
+            "No dbt marts to read",
+            "This dashboard reads the dbt marts exported as Parquet and needs no "
+            "AWS credentials at runtime — but the files have to exist. Expected "
+            f"under <code>{mart_path(MART_LEAGUE_OVERVIEW).parent.as_posix()}/</code>. "
+            "Generate them with <code>dbt build --project-dir dbt</code> then "
+            "<code>python scripts/export_marts.py</code>, which is the only step "
+            "that needs AWS access.",
             stop=True,
         ),
         unsafe_allow_html=True,
     )
     st.stop()
 
-selected_league = "All"
-if "league_code" in df.columns:
-    codes = sorted(df["league_code"].dropna().unique().tolist())
-    st.sidebar.markdown(
-        '<div class="sb-rule" style="margin:12px 0 10px"></div>'
-        '<p class="sb-label">Competition</p>',
-        unsafe_allow_html=True,
-    )
-    if page == "Prediction":
-        selected_league = st.sidebar.selectbox(
-            "Competition",
-            codes,
-            index=codes.index("PL") if "PL" in codes else 0,
-            format_func=lambda x: COMPETITION_NAMES.get(x, x),
-            label_visibility="collapsed",
-            key="comp_pred",
-        )
-    else:
-        selected_league = st.sidebar.selectbox(
-            "Competition",
-            ["All"] + codes,
-            format_func=lambda x: "All competitions"
-            if x == "All"
-            else COMPETITION_NAMES.get(x, x),
-            label_visibility="collapsed",
-            key="comp_all",
-        )
-    if selected_league != "All":
-        df = df[df["league_code"] == selected_league]
+codes = sorted(overview_all["competition_code"].dropna().unique().tolist())
 
-finished = df[df["status"] == "FINISHED"].copy()
-_full = load_data()
-_total_m = int((_full["status"] == "FINISHED").sum())
-_total_l = int(_full["league_code"].nunique()) if "league_code" in _full.columns else 5
+st.sidebar.markdown(
+    '<div class="sb-rule" style="margin:12px 0 10px"></div>'
+    '<p class="sb-label">Competition</p>',
+    unsafe_allow_html=True,
+)
+if page == "Prediction":
+    selected_league = st.sidebar.selectbox(
+        "Competition",
+        codes,
+        index=codes.index("PL") if "PL" in codes else 0,
+        format_func=lambda x: COMPETITION_NAMES.get(x, x),
+        label_visibility="collapsed",
+        key="comp_pred",
+    )
+else:
+    selected_league = st.sidebar.selectbox(
+        "Competition",
+        ["All"] + codes,
+        format_func=lambda x: "All competitions"
+        if x == "All"
+        else COMPETITION_NAMES.get(x, x),
+        label_visibility="collapsed",
+        key="comp_all",
+    )
+
+
+def _for_league(frame: pd.DataFrame) -> pd.DataFrame:
+    """Restreint un mart à la compétition sélectionnée."""
+    if selected_league == "All":
+        return frame
+    return frame[frame["competition_code"] == selected_league]
+
+
+overview = _for_league(overview_all)
+team_form = _for_league(team_form_all)
+matchweek = _for_league(matchweek_all)
+
+_total_m = int(overview_all["matches_played"].sum())
+_total_l = int(overview_all["competition_code"].nunique())
 
 st.sidebar.markdown(
     '<div class="sb-rule" style="margin:16px 0 10px"></div>'
@@ -494,9 +482,9 @@ if page == "Overview":
         unsafe_allow_html=True,
     )
 
-    total = len(finished)
-    total_goals = int(finished["total_goals"].fillna(0).sum())
-    pct_h = float((finished["result"] == "H").mean()) * 100 if total else 0.0
+    total = int(overview["matches_played"].sum())
+    total_goals = int(overview["goals_scored"].sum())
+    pct_h = 100.0 * int(overview["home_wins"].sum()) / total if total else 0.0
     avg_gpm = total_goals / total if total else 0.0
 
     kpis = [
@@ -540,20 +528,24 @@ if page == "Overview":
 
     st.markdown('<span class="sl">Goals per matchweek</span>', unsafe_allow_html=True)
 
-    iso = finished["date"].dt.isocalendar()
+    # mart_matchweek_goals est déjà agrégé par compétition et par semaine ; en
+    # vue « toutes compétitions » il reste à recombiner les semaines, ce qui se
+    # fait sur les totaux et non sur les moyennes.
     weekly = (
-        finished.assign(year=iso["year"].astype(int), week=iso["week"].astype(int))
-        .groupby(["year", "week"])["total_goals"]
-        .agg(["mean", "count"])
-        .reset_index()
-        .sort_values(["year", "week"])
-        .rename(columns={"mean": "avg_goals", "count": "n_matches"})
+        matchweek.groupby("matchweek_start", as_index=False)[
+            ["matches_played", "goals_scored"]
+        ]
+        .sum()
+        .sort_values("matchweek_start")
     )
+    weekly["avg_goals"] = weekly["goals_scored"] / weekly["matches_played"]
+    weekly = weekly.rename(columns={"matches_played": "n_matches"})
+    _iso = pd.to_datetime(weekly["matchweek_start"]).dt.isocalendar()
     weekly["label"] = (
-        weekly["year"].astype(str)
+        _iso["year"].astype(int).astype(str)
         + "-W"
-        + weekly["week"].astype(str).str.zfill(2)
-    )
+        + _iso["week"].astype(int).astype(str).str.zfill(2)
+    ).to_numpy()
 
     fig = go.Figure()
     fig.add_trace(
@@ -605,39 +597,30 @@ if page == "Overview":
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    if "league_code" in finished.columns:
-        st.markdown(
-            '<span class="sl">By competition</span>', unsafe_allow_html=True
-        )
-        lg_stats = (
-            finished.groupby("league_code")
-            .agg(n=("match_id", "count"), goals=("total_goals", "sum"))
-            .reset_index()
-        )
-        lg_stats["avg"] = (lg_stats["goals"] / lg_stats["n"]).round(2)
+    st.markdown('<span class="sl">By competition</span>', unsafe_allow_html=True)
 
-        rows_html = ""
-        for code in ["PL", "FL1", "BL1", "SA", "PD"]:
-            r = lg_stats[lg_stats["league_code"] == code]
-            if r.empty:
-                continue
-            r = r.iloc[0]
-            rows_html += (
-                f"<tr>"
-                f'<td>{COMPETITION_NAMES.get(code, code)}</td>'
-                f'<td class="mono">{int(r["n"]):,}</td>'
-                f'<td class="mono">{int(r["goals"]):,}</td>'
-                f'<td class="mono">{r["avg"]:.2f}</td>'
-                f"</tr>"
-            )
-        st.markdown(
-            '<table class="league-table">'
-            "<thead><tr>"
-            '<th>Competition</th><th>Matches</th><th>Goals</th><th>Avg/match</th>'
-            "</tr></thead>"
-            f"<tbody>{rows_html}</tbody></table>",
-            unsafe_allow_html=True,
+    rows_html = ""
+    for code in ["PL", "FL1", "BL1", "SA", "PD"]:
+        r = overview[overview["competition_code"] == code]
+        if r.empty:
+            continue
+        r = r.iloc[0]
+        rows_html += (
+            f"<tr>"
+            f'<td>{COMPETITION_NAMES.get(code, code)}</td>'
+            f'<td class="mono">{int(r["matches_played"]):,}</td>'
+            f'<td class="mono">{int(r["goals_scored"]):,}</td>'
+            f'<td class="mono">{float(r["avg_goals_per_match"]):.2f}</td>'
+            f"</tr>"
         )
+    st.markdown(
+        '<table class="league-table">'
+        "<thead><tr>"
+        '<th>Competition</th><th>Matches</th><th>Goals</th><th>Avg/match</th>'
+        "</tr></thead>"
+        f"<tbody>{rows_html}</tbody></table>",
+        unsafe_allow_html=True,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -657,7 +640,7 @@ elif page == "Standings":
         label_visibility="collapsed",
     )
     mode_map = {"Home + Away": "both", "Home only": "home", "Away only": "away"}
-    standings = compute_standings(finished, mode_map[mode_label])
+    standings = build_standings(team_form, mode_map[mode_label])
 
     stat_mode = st.radio(
         "Stats",
@@ -741,16 +724,17 @@ elif page == "Prediction":
         )
         st.stop()
 
-    df_feat = compute_features(df)
     metrics = get_league_metrics(selected_league)
     if metrics is not None:
         baseline = metrics["baseline"]
         acc = metrics["accuracy"]
     else:
-        baseline = baseline_accuracy(df)
+        # Même définition que celle mesurée à l'entraînement : la part de
+        # victoires à domicile sur la compétition, que le mart porte déjà.
+        baseline = float(overview["home_win_pct"].mean()) / 100.0
         acc = None
 
-    teams = sorted(finished["home_team"].dropna().unique().tolist())
+    teams = sorted(team_form["team"].dropna().unique().tolist())
 
     col1, vs_col, col2 = st.columns([5, 2, 5])
     with col1:
@@ -778,7 +762,7 @@ elif page == "Prediction":
     st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Predict", use_container_width=True, type="primary"):
-        X_pred = build_prediction_row(df_feat, home_team, away_team)
+        X_pred = fixture_features(team_form, home_team, away_team)
         if X_pred is None:
             st.markdown(
                 theme.state_block(

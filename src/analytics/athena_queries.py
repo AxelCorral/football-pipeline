@@ -7,7 +7,9 @@ Flux d'utilisation :
 
 Notes sur les types Athena :
   - Toutes les valeurs sont retournées en VarCharValue (chaîne).
-  - La conversion de types (int, float, date) est à la charge de l'appelant.
+  - Par défaut la conversion de types reste à la charge de l'appelant ;
+    ``results_to_dataframe(..., coerce_types=True)`` l'effectue à partir des
+    types déclarés par Athena dans les métadonnées du résultat.
   - Les cellules NULL sont représentées par un dict vide ``{}`` dans l'API
     boto3 ; elles sont converties en ``None`` dans le DataFrame résultant.
 """
@@ -26,6 +28,12 @@ POLL_INTERVAL_SECONDS = 2
 MAX_WAIT_SECONDS = 300
 
 _TERMINAL_STATES = frozenset({"SUCCEEDED", "FAILED", "CANCELLED"})
+
+# Types Athena → dtype pandas. Les entiers utilisent Int64 (nullable) : une
+# colonne d'entiers avec des NULL deviendrait sinon du float.
+_INTEGER_TYPES = frozenset({"tinyint", "smallint", "integer", "int", "bigint"})
+_FLOAT_TYPES = frozenset({"float", "real", "double", "decimal"})
+_TEMPORAL_TYPES = frozenset({"date", "timestamp", "timestamp with time zone"})
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +89,7 @@ def results_to_dataframe(
     query_execution_id: str,
     *,
     config: Config | None = None,
+    coerce_types: bool = False,
 ) -> pd.DataFrame:
     """Récupère les résultats d'une requête Athena terminée.
 
@@ -91,10 +100,12 @@ def results_to_dataframe(
     Args:
         query_execution_id: Identifiant retourné par ``run_athena_query``.
         config: Configuration du pipeline ; ``Config.load()`` si None.
+        coerce_types: Si True, convertit chaque colonne selon le type déclaré
+            par Athena (entiers en ``Int64`` nullable, flottants, timestamps).
+            False par défaut — le comportement historique, tout en ``object``.
 
     Returns:
-        DataFrame dont toutes les colonnes sont de type ``object`` (str / None).
-        Appeler ``pd.to_numeric``, ``pd.to_datetime``, etc. pour convertir.
+        DataFrame ; colonnes ``object`` (str / None) sauf si ``coerce_types``.
     """
     if config is None:
         config = Config()
@@ -102,6 +113,7 @@ def results_to_dataframe(
     client = boto3.client("athena", region_name=config.aws_region)
 
     columns: list[str] | None = None
+    column_types: dict[str, str] = {}
     rows: list[list] = []
     next_token: str | None = None
 
@@ -119,6 +131,12 @@ def results_to_dataframe(
         if columns is None:
             # Première page : la ligne 0 contient les noms de colonnes.
             columns = [cell.get("VarCharValue", "") for cell in result_rows[0]["Data"]]
+            column_types = {
+                info["Name"]: info["Type"]
+                for info in resp["ResultSet"]
+                .get("ResultSetMetadata", {})
+                .get("ColumnInfo", [])
+            }
             result_rows = result_rows[1:]
             logger.info(
                 "Colonnes Athena (%d) : %s",
@@ -139,6 +157,8 @@ def results_to_dataframe(
         return pd.DataFrame(columns=columns or [])
 
     df = pd.DataFrame(rows, columns=columns)
+    if coerce_types:
+        df = _coerce_athena_types(df, column_types)
     logger.info(
         "results_to_dataframe : %d lignes, %d colonnes (id=%s)",
         len(df),
@@ -151,6 +171,40 @@ def results_to_dataframe(
 # ---------------------------------------------------------------------------
 # Helpers privés
 # ---------------------------------------------------------------------------
+
+
+def _coerce_athena_types(
+    df: pd.DataFrame,
+    column_types: dict[str, str],
+) -> pd.DataFrame:
+    """Convertit les colonnes selon les types déclarés par Athena.
+
+    Une colonne dont le type est inconnu ou dont la conversion échoue est
+    laissée telle quelle : mieux vaut une chaîne exploitable qu'une exception
+    au milieu d'un export.
+    """
+    for column, athena_type in column_types.items():
+        if column not in df.columns:
+            continue
+        base = athena_type.split("(")[0].strip().lower()
+        try:
+            if base in _INTEGER_TYPES:
+                df[column] = pd.to_numeric(df[column], errors="coerce").astype("Int64")
+            elif base in _FLOAT_TYPES:
+                df[column] = pd.to_numeric(df[column], errors="coerce")
+            elif base in _TEMPORAL_TYPES:
+                df[column] = pd.to_datetime(df[column], errors="coerce")
+            elif base == "boolean":
+                df[column] = (
+                    df[column].map({"true": True, "false": False}).astype("boolean")
+                )
+        except (TypeError, ValueError):
+            logger.warning(
+                "Conversion impossible pour %s (%s) — colonne laissée en texte",
+                column,
+                athena_type,
+            )
+    return df
 
 
 def _wait_for_completion(client, query_execution_id: str) -> None:

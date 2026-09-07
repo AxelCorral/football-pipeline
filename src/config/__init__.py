@@ -11,7 +11,8 @@ Usage test (valeurs nommées, prioritaires sur l'environnement) :
 Variables d'environnement attendues (voir .env.example) :
     API_KEY, FOOTBALL_API_BASE_URL,
     AWS_BUCKET_NAME, AWS_REGION,
-    ATHENA_DATABASE, ATHENA_OUTPUT_S3
+    ATHENA_DATABASE, ATHENA_OUTPUT_S3,
+    DBT_ATHENA_SCHEMA
 """
 
 import os
@@ -48,3 +49,8 @@ class Config:
     aws_region: str = field(default_factory=lambda: _env("AWS_REGION", "eu-west-1"))
     athena_database: str = field(default_factory=lambda: _env("ATHENA_DATABASE"))
     athena_output_s3: str = field(default_factory=lambda: _env("ATHENA_OUTPUT_S3"))
+    # Schéma dans lequel dbt matérialise ses modèles. Distinct de
+    # athena_database — qui est la base source, en lecture seule pour dbt.
+    dbt_athena_schema: str = field(
+        default_factory=lambda: _env("DBT_ATHENA_SCHEMA", "football_analytics_dev")
+    )

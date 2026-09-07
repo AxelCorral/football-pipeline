@@ -21,6 +21,9 @@ from string import Template
 # Tokens
 # ─────────────────────────────────────────────────────────────────────────────
 
+# fmt: off
+# Les commentaires de ces deux tables sont alignés à la main : la colonne de
+# droite se lit comme une légende, et black la casserait.
 COLOR: dict[str, str] = {
     # structure
     "ground": "#111111",       # fond de page
@@ -66,6 +69,7 @@ SIZE: dict[str, str] = {
     "micro": "0.65rem",   # étiquette de KPI, en-tête de tableau
     "nano": "0.62rem",
 }
+# fmt: on
 
 # Une seule graduation d'espacement, en px.
 SPACE = (4, 8, 12, 16, 20, 28, 40, 56)
@@ -88,8 +92,7 @@ def _t(name: str) -> str:
 # Feuille de style
 # ─────────────────────────────────────────────────────────────────────────────
 
-_CSS_TEMPLATE = Template(
-    """
+_CSS_TEMPLATE = Template("""
 <style>
 @import url('$fonts_url');
 
@@ -635,8 +638,7 @@ hr {
     .dbar-cell { display: none; }
 }
 </style>
-"""
-)
+""")
 
 
 def css() -> str:

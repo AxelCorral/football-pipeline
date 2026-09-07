@@ -2,6 +2,9 @@
 # (voir .gitlab-ci.yml : jobs lint:* et test:unit).
 black==26.5.1
 coverage==7.14.1
+# Lecture de l'entrepôt local produit par `dbt build --target dev`
+# (scripts/export_marts.py --source duckdb, tests/test_marts.py).
+duckdb==1.5.5
 flake8==7.3.0
 pytest==9.0.3
 pytest-cov==7.1.0
