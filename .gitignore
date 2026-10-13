@@ -62,3 +62,13 @@ dbt/logs/
 dbt/.user.yml
 dbt/*.duckdb
 dbt/*.duckdb.wal
+
+# Environnement : tout .env.* sauf l'exemple
+.env.*
+!.env.example
+
+# Environnements virtuels (toute variante)
+.venv*/
+
+# Dossier de travail local
+design/live/
